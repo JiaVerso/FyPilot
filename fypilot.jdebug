@@ -30,6 +30,8 @@ void OnProjectLoad (void) {
   Project.SetTIFSpeed ("12 MHz");
   Project.AddSvdFile ("$(InstallDir)/Config/CPU/Cortex-M7F.svd");
   Project.AddSvdFile ("/opt/st/stm32cubeclt_1.21.0/STMicroelectronics_CMSIS_SVD/STM32H743.svd");
+
+  Project.SetOSPlugin("/opt/SEGGER/Ozone_V352/Plugins/OS/RtThreadOSPlugin.js");
   //
   // User settings
   //

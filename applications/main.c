@@ -14,5 +14,5 @@ int main(void)
     fc_init();
     SEGGER_RTT_Init();
 
-    SEGGER_RTT_printf(0, "Hello FyPilot! count=%u\r\n", 123U);
+    SEGGER_RTT_printf(0, "Hello FyPilot!");
 }
