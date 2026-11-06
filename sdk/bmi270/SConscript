@@ -1,0 +1,5 @@
+from building import *
+cwd = GetCurrentDir()
+objs = DefineGroup('Bosch BMI270 SensorAPI', ['bmi2.c', 'bmi270.c'],
+    depend=['BSP_USING_BMI270'], CPPPATH=[cwd])
+Return('objs')

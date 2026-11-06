@@ -1,0 +1,17 @@
+mainmenu "FyPilot / AOPAH743 standalone firmware"
+BSP_DIR := .
+RTT_DIR := ../../sdk/rt-thread
+config SOC_FAMILY_STM32
+    bool
+    default y
+config SOC_SERIES_STM32H7
+    bool
+    default y
+    select ARCH_ARM_CORTEX_M7
+config SOC_STM32H743VI
+    bool
+    default y
+    select RT_USING_COMPONENTS_INIT
+    select RT_USING_USER_MAIN
+source "$(RTT_DIR)/Kconfig"
+rsource "board/Kconfig"

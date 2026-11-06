@@ -1,0 +1,212 @@
+AOPAH743 / FyPilot STM32H743 独立工程
+更新：2026-11-06
+
+交付内容
+========
+本工程与原 rt-thread 仓库同级，可以单独复制和使用 SCons 构建。
+RT-Thread 的 src、include、components、libcpu、tools 已从原仓库完整复制，
+包含整个 components/drivers，不再裁剪这些目录。STM32 公共驱动也完整保留。
+ST 的 STM32H7 HAL、LL、CMSIS-device 源码完整保留，包括尚未启用的外设实现。
+“保留全部源码”和“启用全部功能”是不同操作：SCons/Kconfig 只编译所选的 RTT
+模块，HAL 配置宏选择外设代码。未启用的外设仍需配置引脚、时钟、中断及 DMA。
+需要额外软件包的组件，仍需提供该软件包；源码保留不代表所有硬件已经验证。
+
+当前默认固件：Hello World + CRSF 接收 + FinSH。
+上电经 USART3 每秒输出 Hello World，同时 USART6 接收 CRSF 的 16 路通道。
+BMI270、矩阵等已保留在另一可编译配置；关闭 Hello World 选项即可启用调试模式。
+电机信号仍为下拉输入，当前没有连接 PID/mixer 或电调输出。
+
+目录结构
+========
+按功能归入 app、drivers、bsp、sdk；应用源码不再按原运行平台分组。
+  app/
+    main.c                           Hello World/fc_init 应用入口
+    fc/                              初始化、自检、状态、飞控控制台
+    rx/                              CRSF 协议源码、移植后的解析器、串口接入
+    flight/ekf/                      四元数 EKF
+    flight/pid/                      PID 计算、参数与滤波初始化
+    flight/attitude/                 四元数接口
+    sensors/                         BMI270 采样、传感器管理、传感器滤波接口
+    tasks/                           姿态、控制、位置、通信、日志等任务
+    common/                          通用类型、滤波、CRC、转换、传感器方向
+    common/math/                     数学与矩阵运算
+    common/buffer/                   共用环形缓冲区（保留已验证修复）
+    middleware/ipc/、umcn/           线程通信、消息发布订阅
+    platform/                        RT-Thread OS、时间、内存、调度适配
+    simulation/                      虚拟 IMU/电机/遥控器、传感器回放
+    config/                          飞行任务配置
+    Kconfig、SConscript              原任务配置定义、当前有效构建清单
+  drivers/
+    bmi270/                          BMI270 的 RT-Thread SPI 板级适配
+    barometer/                       DPS368 气压计驱动源码
+    SConscript                       仅选择已完成适配的硬件驱动
+  bsp/stm32h743/
+    SConstruct、.config、rtconfig.py  SCons 入口、配置、工具链
+    board/                           板型、时钟、引脚、HAL MSP、启动链接布局
+    build/                           ELF/BIN/HEX/MAP 输出
+  sdk/
+    rt-thread/src、include/           完整内核与公共头文件
+    rt-thread/components/            完整组件与抽象设备驱动
+    rt-thread/libcpu、tools/          完整 CPU 移植层与构建工具
+    stm32/hal/                       完整 STM32H7 HAL/LL
+    stm32/cmsis-device/              完整 STM32H7 芯片头文件与启动模板
+    stm32/rt-hal-drivers/             完整 RT-Thread STM32 公共驱动
+    bmi270/                          Bosch 官方传感器 API 与配置数据
+    cmsis-dsp/                       既有 f32 矩阵运算依赖
+    VERSIONS                         版本与本地补丁记录
+  tools/                             下载脚本、固件验证、宿主机检查
+    tests/rx_crsf_unittest.cc         协议原有单元测试源码（需 BF/gtest 环境）
+    source_relocation.csv            78 项源文件旧路径、新路径、哈希及归并原因
+
+本次将原归档中的 78 项文件按职责逐项处理：65 项迁入对应模块；7 项完全相同
+的文件（含重复许可证）合并；6 项保留工程中已有的适配/修复版本。原空闲 main
+并入 app/main.c，旧构建清单并入 app/SConscript。原路径仅留在迁移清单作追溯，
+工程内已移除 reference 目录以及按来源分组的目录。
+
+编译边界
+========
+app/SConscript 和 drivers/SConscript 使用明确的源文件列表，不递归自动编译。
+当前编译：main、fc_init、crsf_parser、receiver_crsf；IMU 调试配置再编译
+bmi270_port、imu_task、mp_os、mp_time、my_math、buffer、mp_selftest。
+
+其他源码已按功能放入工程，但仍有待适配的外部接口，未加入当前固件：
+- flight/pid、common/filter.c、sdft.c、crc.c 等文件仍依赖 BF 的平台、axis、maths、PG 等。
+- flight/ekf 已归入算法模块，尚未接入 BMI270 -> EKF -> PID -> mixer 控制链。
+- sensors/sensor_manager、tasks、高频任务还依赖原参数、校准、设备或 C++ 支持。
+- drivers/barometer 是 DPS368；不能据此认为板上的 DPS310 已完成适配。
+- app/rx/crsf.c/.h 是完整协议原文件；实际构建的是 crsf_parser.c/.h。
+  两者不能同时编译；原 BF 实现还依赖 telemetry/MSP 等未移入的完整 BF 环境。
+- app/Kconfig 保留原任务/气压计配置定义，暂未纳入 BSP 菜单；当前有效开关
+  仍在 bsp/stm32h743/board/Kconfig，不能通过旧任务开关直接启动未适配任务。
+- 仿真源在 app/simulation，以后用于测试；不加入 H743 硬件启动路径。
+
+因此，文件归位不等于完整飞控控制链已经接通。当前固件保持可构建的
+Hello World + CRSF 或 IMU + CRSF 配置，不自动运行未完成的控制/电机任务。
+
+硬件
+====
+STM32H743VIH6；外部晶体 8MHz；LDO；CPU 400MHz，HCLK 200MHz，APB 100MHz。
+Flash 2MiB，应用从 0x08000000 启动；使用 0x24000000 的 512KiB AXI SRAM。
+启用 I-Cache，未启用 D-Cache 和 UART/SPI DMA。
+USART3：PD8 TX / PD9 RX，115200 8N1，控制台。
+USART6：PC7 RX / PC6 TX，420000 8N1，无反相；本版本仅接收，不发送遥测。
+BMI270 调试模式：SPI4 PE12/PE13/PE14，CS PE11，INT1 PE15。
+完整引脚表：bsp/stm32h743/board/pinmap.csv。
+
+CRSF 接收与接口
+==============
+参考源：HPMicro 官方 hpmicro/betaflight，dev/hpmicro 分支，固定提交
+  e80cc494434eee17a113678b31d0f24311264cb1
+地址与许可详见 app/rx/ORIGIN.txt、sdk/VERSIONS。
+按其 crsfDataReceive -> crsfFrameStatus -> crsfReadRawRC 接收路径进行适配。
+沿用 CRC-8/DVB-S2 多项式 0xD5、FC 地址 0xC8、0x16 打包格式及 legacy 比例。
+为避免编译器位域布局依赖，改为显式解包 16 个 11bit 通道。
+
+链路：USART6 中断 -> RT-Thread 官方串口 FIFO -> CRSF 线程 -> 校验/解包 -> 快照。
+默认 FIFO 1024 字节，线程每 1ms 读取一次，每轮最多读取 16*64 字节。
+中断不做协议解码；当前没有启用 DMA。
+解析支持任意分包/粘包、长度检查、CRC 失败后重同步、20ms 半帧超时。
+只接受完整且 CRC 正确的 FC 0x16 通道帧。
+同时接收 0x14 链路统计：LQ、活动天线 RSSI、SNR、RF mode；统计 250ms 过期。
+0x17 subset、遥测发送、MSP、CRSF V3 波特率协商未移植，会被忽略。
+
+查看通道：在 USART3 的 FinSH 控制台输入 crsf。
+命令显示 CH01..CH16 的 raw 和 us、累计帧数、CRC/长度错误、RC 数据年龄及有效性。
+raw 为 0..2047 的原始 11bit 值；us 是供控制层使用的等效脉宽，不是引脚 PWM。
+按 HPM BF 的换算后取整：172 -> 988us，992 -> 1500us，1811 -> 2012us。
+通道顺序保持接收机原顺序，尚未替用户假定 AETR/TAER 等映射。
+
+其他模块获取通道：
+  #include "rx/receiver_crsf.h"
+  crsf_state_t rc;
+  if (crsf_receiver_get(&rc)) {
+      // rc.raw[0] / rc.channel_us[0] 为通道1，数组下标 0..15
+  }
+返回 true 才表示已有且未超时的通道。默认 100ms 无有效 RC 帧则返回 false；
+无效时保留上次通道供诊断，不把零值或居中值伪装为收到的数据。
+0x14 统计帧或其他合法帧不会刷新通道时间。
+快照发布和读取均有短临界区，避免半组通道；解析本身在普通线程执行。
+这只是接收通道的新鲜度判断，尚未连接飞控解锁、无线失联策略及电机状态机。
+
+接线与启动观察
+==============
+接收机 TX -> PC7（USART6 RX），接收机 GND -> 飞控 GND，按接收机规格供电。
+PC6 为 UART TX 引脚，本版本未发送 CRSF 遥测，可不接接收机 RX。
+控制台：PD8 -> 3.3V USB-TTL RX，PD9 -> USB-TTL TX，两者共地，115200 8N1。
+当前未实现 USB 虚拟串口；TTL 应用 3.3V 电平。
+上电预期先打印初始化结果，然后每秒一行 Hello World。
+输入 crsf 检查 started=1、valid=1、帧数增长和摇杆对应通道变化。
+首次未收到帧时明确输出 No valid RC frame received，不显示伪造通道。
+断开接收机后超过配置超时，valid 应变为 0。
+尚未连接目标板实测，以上是预期现象。
+
+SCons 编译
+==========
+需要 Python3、SCons 4.x、kconfiglib、带 newlib 的 ARM GCC。
+安装 Python 依赖：python3 -m pip install -r requirements.txt
+工具链先查 RTT_EXEC_PATH，再查 PATH，最后查 /opt/st/stm32cubeclt_*。
+工具链未复制到工程中，本机为 GNU Tools for STM32 GCC 14.3.1。
+
+工程根目录：
+  ./build.sh -j8
+  python3 tools/verify_firmware.py --profile hello --require-crsf
+或者直接在 bsp/stm32h743：
+  scons --pyconfig-silent
+  scons -j8
+build.sh 就是上述两个 SCons 调用的包装，未改用其他构建系统。
+
+修改 .config 后必须运行 scons --pyconfig-silent，禁止手工改 rtconfig.h。
+也可用 scons --menuconfig。在 AOPAH743 hardware 下可选择：
+  BSP_USING_HELLO_WORLD         默认 y，打印 Hello World，暂不启动 BMI270
+  BSP_USING_CRSF                默认 y，自动选择 UART6
+  BSP_CRSF_RX_BUFFER_SIZE       默认 1024
+  BSP_CRSF_SIGNAL_TIMEOUT_MS    默认 100，可按接收机更新周期调整
+关闭 Hello World 后检查 SPI4/BMI270 选项，编译 IMU 调试模式：
+  python3 tools/verify_firmware.py --profile imu --require-crsf
+完整源码保留在 SDK；运行功能仍由 Kconfig 和 HAL 配置控制，不能直接开启未知引脚。
+
+J-Link / SWD 下载
+=================
+在工程根目录执行 ./flash.sh，或 tools/flash_jlink.sh。
+有 JLinkExe 时优先用 SEGGER 工具；否则尝试已安装的 OpenOCD J-Link 驱动。
+连接 PA13 SWDIO、PA14 SWCLK、GND、VTref，板卡正常供电。
+器件 STM32H743VI，SWD 1000kHz；默认 SYSRESETREQ 复位，不假定有 NRST。
+默认下载 bsp/stm32h743/build/fypilot.elf，先验证固件再擦写/校验/复位。
+也可使用 build/fypilot.hex；BIN 的下载起始地址必须为 0x08000000。
+本工程按无已有 bootloader 配置；ELF、BIN、HEX、MAP 在 build 下。
+没有连接可见的 J-Link 和目标板，未执行真实烧录。
+
+检查
+====
+  python3 tools/check_crsf.py
+  python3 tools/check_math.py
+  python3 tools/check_buffer.py
+  python3 tools/verify_firmware.py --require-crsf
+CRSF 使用 HPM 官方抓包样例和预期通道值，并检查逐字节/各种分段、CRC 错误、
+非法长度、噪声重同步、帧超时、32bit 时间回绕、链路统计和信号新鲜度。
+还检查 5000 组随机通道和 250000 个噪声字节，开启 ASan/UBSan。
+矩阵与缓冲区检查验证了目录移动后的构建引用。
+交叉编译和宿主机检查不能替代真实串口波形、任务时序、接收机及板卡测试。
+
+许可
+====
+RT-Thread、ST、Bosch、Arm 源码的原许可证均保留在各目录。
+CRSF 移植代码来自/参考 GPL-3.0-or-later 的 HPM Betaflight，原文与版本保留。
+原 QEMU 应用中的 Betaflight 派生代码也保留 GPL 声明。发布时保留相关许可。
+本工程根目录 COPYING.GPL-3.0 为该部分代码的许可证文本。
+
+本次验证记录（2026-11-06）
+=========================
+完整 RTT 源码逐文件哈希一致：src 86、include 14、components 2759、
+libcpu 595、tools 107 个源文件，与原仓库对应内容逐字节一致。
+构建工具另外保留一份 COPYING.GPL-2.0 许可证文本。
+Hello+CRSF 和 IMU+CRSF 两种配置均用 SCons 交叉编译，无编译警告。
+当前交付配置已恢复 Hello+CRSF：Flash 加载镜像 63192 bytes，
+静态 RAM（含 MSP）10096 bytes，不含运行时动态分配的线程栈/串口 FIFO。
+ELF/BIN/HEX 内容一致，USART6 向量指向真实驱动中断函数。
+检查器能拒绝损坏的 USART6 向量。CRSF/数学/缓冲区宿主机检查通过。
+复制到新目录（包含空格）、删除 rtconfig.h，设置不存在的 RTT_ROOT/ENV_ROOT
+后仍能独立生成配置并完成编译、固件验证，不依赖原 RT-Thread 源码目录。
+本次目录重组后，两种配置重新交叉编译、无警告，CRSF/数学/缓冲区检查重新通过。
+78 项输入文件的迁移/去重/归并记录和最终内容哈希已逐项验证。
+这些检查未替代上板烧录、接收机通信和飞行验证。

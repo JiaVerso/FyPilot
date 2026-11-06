@@ -1,0 +1,17 @@
+import os
+from building import *
+cwd = GetCurrentDir()
+# Explicit source selection prevents unfinished modules from auto-starting.
+src = ['main.c', 'fc/fc_init.c']
+if GetDepend('BSP_USING_CRSF'):
+    src += ['rx/crsf_parser.c', 'rx/receiver_crsf.c']
+if not GetDepend('BSP_USING_HELLO_WORLD'):
+    src += ['platform/mp_os.c', 'platform/mp_time.c', 'common/math/my_math.c',
+            'common/buffer/buffer.c', 'fc/mp_selftest.c']
+if GetDepend('BSP_USING_BMI270'):
+    src += ['sensors/imu_task.c']
+paths = [cwd] + [os.path.join(cwd, name) for name in
+    ('fc', 'rx', 'sensors', 'platform', 'common', 'common/math', 'common/buffer')]
+objs = DefineGroup('FyPilot flight modules', src, depend=[''], CPPPATH=paths,
+                   LOCAL_CFLAGS=' -Wextra -Wno-cast-function-type')
+Return('objs')

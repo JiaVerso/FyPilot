@@ -1,0 +1,5 @@
+from building import *
+cwd = GetCurrentDir()
+objs = DefineGroup('AOPAH743 sensor adapter', ['bmi270/bmi270_port.c'],
+    depend=['BSP_USING_BMI270'], CPPPATH=[cwd + '/bmi270'], LOCAL_CFLAGS=' -Wextra')
+Return('objs')

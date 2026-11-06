@@ -1,0 +1,3 @@
+from building import *
+objs = SConscript('board/SConscript')
+Return('objs')

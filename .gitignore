@@ -1,0 +1,28 @@
+build/
+*.o
+*.d
+*.a
+*.elf
+*.bin
+*.hex
+*.map
+.sconsign.dblite
+__pycache__/
+*.pyc
+bsp/stm32h743/rtconfig.h
+bsp/stm32h743/.config.old
+
+# Local Python environments and editor state
+.venv/
+venv/
+.env
+.env.*
+.vscode/
+.idea/
+*.log
+*.tar.gz
+*.zip
+
+# Upstream SDK libraries are source dependencies, not build outputs.
+!sdk/rt-thread/components/drivers/usb/cherryusb/port/pusb2/*.a
+!sdk/rt-thread/components/drivers/usb/cherryusb/port/xhci/phytium/*.a

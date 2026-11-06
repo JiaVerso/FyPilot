@@ -1,0 +1,13 @@
+import os
+from building import *
+cwd = GetCurrentDir()
+base = 'hal/Src'
+# Keep the complete H7 HAL/LL source tree; module macros in hal_conf select code.
+src = [os.path.relpath(str(path), cwd) for path in Glob('hal/Src/*.c')
+       if 'template' not in str(path).lower()]
+src += ['cmsis-device/Source/Templates/system_stm32h7xx.c',
+        'cmsis-device/Source/Templates/gcc/startup_stm32h743xx.s']
+objs = DefineGroup('STM32H7 HAL and CMSIS', src, depend=[''],
+    CPPPATH=[os.path.join(cwd, 'hal/Inc'), os.path.join(cwd, 'cmsis-device/Include')])
+objs += SConscript('rt-hal-drivers/SConscript')
+Return('objs')

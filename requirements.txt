@@ -1,0 +1,2 @@
+scons>=4.0.1,<5
+kconfiglib==14.1.0

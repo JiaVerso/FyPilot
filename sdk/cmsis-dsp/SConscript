@@ -1,0 +1,7 @@
+from building import *
+cwd = GetCurrentDir()
+src = ['Source/MatrixFunctions/arm_mat_' + op + '_f32.c'
+       for op in ['init', 'add', 'sub', 'mult', 'trans', 'inverse']]
+objs = DefineGroup('CMSIS-DSP matrix subset', src, depend=[''],
+    CPPPATH=[cwd + '/Include'], CPPDEFINES=['ARM_MATH_CM7', 'ARM_MATH_MATRIX_CHECK'])
+Return('objs')

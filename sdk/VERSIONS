@@ -1,0 +1,25 @@
+RT-Thread complete src/include/components/libcpu/tools: acf38147b382beb8d8287fe809d8de9a76e1e3b4
+hal: 7e541d92019e18f98d211fc4ab9197ec8e8105f6
+device: 81db1ec63cdc191fae1565b772da3ea5aa29a683
+bmi270: 41129fcfe39c583ee5462d79195741945d51c1fe
+CMSIS-DSP v1.16.2: d5717e454fec0337bef114a21f1d2d01d74f2701
+
+Local adaptations in the extracted copy only:
+- ST startup Reset_Handler calls RT-Thread entry instead of application main.
+- RT-Thread STM32 SPI: H743 per-instance SPI123/SPI45/SPI6 kernel clock selection.
+- RT-Thread STM32 H7 UART config: add missing USART6 non-DMA descriptor.
+- RT-Thread SPI polling-only build: mark async_started intentionally unused.
+- Original my_math header: use DSP matrix header; repair malformed comment.
+- Original buffer: finish write return value, newest-byte overwrite, bounded reads, lifecycle checks.
+- Complete RT-Thread kernel/components/drivers, CPU ports and tools are retained.
+- Complete STM32H7 HAL/CMSIS sources are retained; build selects enabled modules.
+
+HPMicro Betaflight CRSF reference: e80cc494434eee17a113678b31d0f24311264cb1 (dev/hpmicro)
+https://github.com/hpmicro/betaflight/tree/e80cc494434eee17a113678b31d0f24311264cb1
+- Local CRSF port: app/rx/crsf_parser.c/.h and receiver_crsf.c/.h; GPL-3.0-or-later, receive-only 0x16/0x14.
+
+2026-11-06 functional layout:
+- Application entry and modules: app/; board-specific configuration: bsp/stm32h743/.
+- Sensor adapters: drivers/bmi270/ and drivers/barometer/.
+- Source relocation and deduplication: tools/source_relocation.csv.
+- No source-origin grouping directories remain; SDK sources unchanged.

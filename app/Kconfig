@@ -1,0 +1,43 @@
+# Task scaffold definitions retained for subsequent porting.
+# Not sourced by the active H743 BSP until these tasks and DPS368 are adapted.
+
+menuconfig BSP_USING_FYPILOT
+    bool "Enable FyPilot flight-control practice project"
+    default y
+    help
+        Enable the minimal FyPilot scaffold used to port and study
+        StarryPilot tasks on RT-Thread v5.x. Hardware integration is required.
+
+if BSP_USING_FYPILOT
+
+config FYPILOT_LOOP_HZ
+    int "Initial flight loop frequency (Hz)"
+    range 1 1000
+    default 250
+
+config FYPILOT_USING_DPS368
+    bool "Automatically register DPS368 barometer"
+    depends on RT_USING_I2C
+    default n
+    help
+        Register the DPS368 as an RT-Thread device during application init.
+        Keep disabled until the I2C bus and sensor are adapted for this board.
+        The active H743 build does not currently compile this driver.
+
+if FYPILOT_USING_DPS368
+
+config FYPILOT_DPS368_DEVICE_NAME
+    string "DPS368 RT-Thread device name"
+    default "baro"
+
+config FYPILOT_DPS368_I2C_BUS_NAME
+    string "DPS368 I2C bus name"
+    default "i2c1"
+
+config FYPILOT_DPS368_I2C_ADDRESS
+    hex "DPS368 7-bit I2C address"
+    range 0x76 0x77
+    default 0x77
+
+endif
+endif

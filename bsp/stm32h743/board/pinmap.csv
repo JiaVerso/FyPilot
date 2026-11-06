@@ -1,0 +1,63 @@
+function,pin,peripheral,firmware_status,note
+console TX,PD8,USART3,enabled,115200 8N1
+console RX,PD9,USART3,enabled,115200 8N1
+receiver TX,PC6,USART6,pin configured; CRSF TX unused,CRSF telemetry not implemented
+receiver RX,PC7,USART6,enabled,CRSF receiver TX -> PC7; 420000 8N1; no inversion
+TX,PA9,USART1,recorded only,
+RX,PA10,USART1,recorded only,
+TX,PD5,USART2,recorded only,
+RX,PD6,USART2,recorded only,
+TX,PB9,UART4,recorded only,
+RX,PB8,UART4,recorded only,
+TX,PE8,UART7,recorded only,
+RX,PE7,UART7,recorded only,
+TX,PE1,UART8,recorded only,
+RX,PE0,UART8,recorded only,
+SCK,PA5,SPI1,recorded only,
+MISO (SDI),PA6,SPI1,recorded only,
+MOSI (SDO),PD7,SPI1,recorded only,
+SCK,PB13,SPI2,recorded only,
+MISO (SDI),PB14,SPI2,recorded only,
+MOSI (SDO),PB15,SPI2,recorded only,
+SCK,PB3,SPI3,recorded only,
+MISO (SDI),PB4,SPI3,recorded only,
+MOSI (SDO),PB5,SPI3,recorded only,
+SCK,PE12,SPI4,IMU profile only; disabled in Hello World,
+MISO (SDI),PE13,SPI4,IMU profile only; disabled in Hello World,
+MOSI (SDO),PE14,SPI4,IMU profile only; disabled in Hello World,
+BMI270 CS,PE11,SPI4,IMU profile only; disabled in Hello World,U12; CW0_DEG/identity requires measurement
+BMI270 INT1,PE15,EXTI15,IMU profile only; disabled in Hello World,rising edge; ISR wakes thread
+SCL,PB6,I2C1,recorded only,
+SDA,PB7,I2C1,recorded only,
+SCL,PB10,I2C2,recorded only,I2C2: DPS310/IST8310 per supplied configuration
+SDA,PB11,I2C2,recorded only,I2C2: DPS310/IST8310 per supplied configuration
+MOTOR1,PB0,GPIO,input pulldown,PWM/DShot disabled
+MOTOR2,PB1,GPIO,input pulldown,PWM/DShot disabled
+MOTOR3,PA0,GPIO,input pulldown,PWM/DShot disabled
+MOTOR4,PA1,GPIO,input pulldown,PWM/DShot disabled
+MOTOR5,PA2,GPIO,input pulldown,PWM/DShot disabled
+MOTOR6,PA3,GPIO,input pulldown,PWM/DShot disabled
+MOTOR7,PD12,GPIO,input pulldown,PWM/DShot disabled
+MOTOR8,PD13,GPIO,input pulldown,PWM/DShot disabled
+MOTOR9,PD14,GPIO,input pulldown,PWM/DShot disabled
+MOTOR10,PD15,GPIO,input pulldown,PWM/DShot disabled
+BEEPER,PA15,,recorded only,
+LED0,PE3,,recorded only,
+LED1,PE4,,recorded only,
+LED_STRIP,PA8,,recorded only,
+MAX7456_CS,PB12,,recorded only,
+ADC_VBAT,PC0,,recorded only,
+ADC_CURRENT,PC1,,recorded only,
+ADC_RSSI,PC5,,recorded only,
+ADC_EXTERNAL1,PC4,,recorded only,
+ADC_CURRENT2,PA7,,recorded only,
+SDMMC_CLK,PC12,,recorded only,
+SDMMC_CMD,PD2,,recorded only,
+SDMMC_D0,PC8,,recorded only,
+SDMMC_D1,PC9,,recorded only,
+SDMMC_D2,PC10,,recorded only,
+SDMMC_D3,PC11,,recorded only,
+PINIO1,PD10,,recorded only,
+PINIO2,PD11,,recorded only,
+SWDIO,PA13,SWD,debug interface,J-Link SWD; connect GND and VTref
+SWCLK,PA14,SWD,debug interface,J-Link SWD; connect GND and VTref
