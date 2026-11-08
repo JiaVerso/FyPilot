@@ -35,7 +35,6 @@ config BSP_STM32_UART_V1_TX_TIMEOUT
     default 20
 config BSP_USING_SPI
     bool
-    depends on !BSP_USING_HELLO_WORLD
     default y
     select RT_USING_SPI
 config BSP_USING_SPI4
