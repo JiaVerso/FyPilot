@@ -9,7 +9,7 @@
 #define FLIGHT_LOOP_HZ 250
 #endif
 
-#define FLIGHT_THREAD_NAME       "mp_flight"
+#define FLIGHT_THREAD_NAME       "flight"
 #define FLIGHT_THREAD_STACK_SIZE 4096
 #define TEST_THREAD_PRIORITY   12
 #define FLIGHT_THREAD_TIMESLICE  5

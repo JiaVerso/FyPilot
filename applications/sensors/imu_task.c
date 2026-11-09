@@ -45,7 +45,7 @@ static void imu_entry(void *parameter)
             ++error_count;
     }
 }
-rt_err_t aopa_imu_start(void)
+rt_err_t mp_bmi270_start(void)
 {
     rt_err_t err;
     if (started)

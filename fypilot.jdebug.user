@@ -1,7 +1,7 @@
 
 
 
-Breakpoint=/home/warnie/Documents/Fy-Power/Dual redundancy/02_Firmware/FyPilot/applications/fc/flight_app.c:56, State=BP_STATE_ON
+Breakpoint=/home/warnie/Documents/Fy-Power/Dual redundancy/02_Firmware/FyPilot/applications/fc/flight_app.c:53, State=BP_STATE_ON
 Breakpoint=0x00000000, State=BP_STATE_DISABLED
 OpenDocument="flight_app.c", FilePath="/home/warnie/Documents/Fy-Power/Dual redundancy/02_Firmware/FyPilot/applications/fc/flight_app.c", Line=41
 OpenDocument="components.c", FilePath="/home/warnie/Documents/Fy-Power/Dual redundancy/02_Firmware/FyPilot/sdk/rt-thread/src/components.c", Line=158
@@ -9,21 +9,24 @@ OpenDocument="startup_stm32h743xx.s", FilePath="/home/warnie/Documents/Fy-Power/
 OpenDocument="kservice.c", FilePath="/home/warnie/Documents/Fy-Power/Dual redundancy/02_Firmware/FyPilot/sdk/rt-thread/src/kservice.c", Line=1469
 OpenDocument="main.c", FilePath="/home/warnie/Documents/Fy-Power/Dual redundancy/02_Firmware/FyPilot/applications/main.c", Line=0
 OpenToolbar="Debug", Floating=0, x=0, y=0
-OpenWindow="Call Stack", DockArea=RIGHT, x=0, y=2, w=711, h=226, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
-OpenWindow="Registers 1", DockArea=RIGHT, x=0, y=1, w=711, h=368, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, FilteredItems=[], RefreshRate=2
-OpenWindow="Memory 1", DockArea=BOTTOM, x=2, y=0, w=893, h=324, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, EditorAddress=0x0
-OpenWindow="Watched Data 1", DockArea=LEFT, x=0, y=1, w=376, h=352, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, RefreshRate=2
-OpenWindow="Functions", DockArea=LEFT, x=0, y=0, w=376, h=482, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
-OpenWindow="Terminal", DockArea=BOTTOM, x=1, y=0, w=582, h=324, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
-OpenWindow="Console", DockArea=BOTTOM, x=0, y=0, w=528, h=324, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
-OpenWindow="RT-Thread", DockArea=RIGHT, x=0, y=0, w=711, h=239, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, Showing="Threads"
+OpenWindow="Call Stack", DockArea=RIGHT, x=0, y=2, w=711, h=228, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
+OpenWindow="Registers 1", DockArea=RIGHT, x=0, y=1, w=711, h=365, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, FilteredItems=[], RefreshRate=2
+OpenWindow="Memory 1", DockArea=BOTTOM, x=2, y=0, w=893, h=323, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, EditorAddress=0x24002E9C
+OpenWindow="Watched Data 1", DockArea=LEFT, x=0, y=1, w=529, h=354, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, RefreshRate=2
+OpenWindow="Functions", DockArea=LEFT, x=0, y=0, w=529, h=480, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
+OpenWindow="Terminal", DockArea=BOTTOM, x=1, y=0, w=582, h=323, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
+OpenWindow="Console", DockArea=BOTTOM, x=0, y=0, w=528, h=323, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
+OpenWindow="RT-Thread", DockArea=RIGHT, x=0, y=0, w=711, h=240, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, Showing="Threads"
 SmartViewPlugin="", Page="", Toolbar="Hidden", Window="SmartView 1"
 TableHeader="Functions", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Name";"Address";"Size";"#Insts";"Source"], ColWidths=[1090;95;59;59;194]
 TableHeader="Call Stack", SortCol="Function", SortOrder="ASCENDING", VisibleCols=["Function";"Stack Frame";"Source";"PC";"Return Address";"Stack Used"], ColWidths=[165;140;158;95;212;55]
 TableHeader="Power Sampling", SortCol="None", SortOrder="ASCENDING", VisibleCols=["Index";"Time";"Ch 0"], ColWidths=[100;100;100]
 TableHeader="Registers 1", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Name";"Description";"Value"], ColWidths=[178;294;223]
-TableHeader="Watched Data 1", SortCol="Expression", SortOrder="ASCENDING", VisibleCols=["Expression";"Value";"Location"], ColWidths=[164;83;129]
+TableHeader="Watched Data 1", SortCol="Expression", SortOrder="ASCENDING", VisibleCols=["Expression";"Value";"Location"], ColWidths=[164;227;122]
 TableHeader="RegisterSelectionDialog", SortCol="None", SortOrder="ASCENDING", VisibleCols=[], ColWidths=[]
-TableHeader="Threads", SortCol="None", SortOrder="ASCENDING", VisibleCols=["Name";"Priority";"Status";"SP";"Stack Base";"Stack Size"], ColWidths=[110;110;110;110;110;161]
 TableHeader="TargetExceptionDialog", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Name";"Value";"Address";"Description"], ColWidths=[26;26;26;26]
+TableHeader="Threads", SortCol="None", SortOrder="ASCENDING", VisibleCols=["Name";"Priority";"Status";"SP";"Stack Base";"Stack Size"], ColWidths=[110;110;110;110;110;161]
 WatchedExpression="flight_loop_count", RefreshState=2, Window=Watched Data 1
+WatchedExpression="*(struct rt_thread *)rt_current_thread", RefreshState=2, Window=Watched Data 1
+WatchedExpression="_object_container[0]", RefreshState=2, Window=Watched Data 1
+WatchedExpression="thread_test_handle", RefreshState=2, Window=Watched Data 1

@@ -1,3 +1,11 @@
+/*
+ * @Author: Jack Shaw 2870998241@qq.com
+ * @Date: 2026-11-05 20:45:56
+ * @LastEditors: Jack Shaw 2870998241@qq.com
+ * @LastEditTime: 2026-11-09 10:37:36
+ * @FilePath: /FyPilot/applications/tasks/tasks.h
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Adapted from the Cleanflight/Betaflight task registration interface.
  */
@@ -12,9 +20,16 @@ typedef enum
     TASK_IMU,
     TASK_FLIGHT,
     TASK_COUNT
-} taskId_e;
+} taskid_e;
 
 typedef struct
+{
+    const char *name;
+    const char *trigger;
+    task_start_func start;
+} task_definition_t;
+
+typedef struct task_status_s
 {
     const char *name;
     const char *trigger;
@@ -23,11 +38,9 @@ typedef struct
     rt_err_t startResult;
 } task_status_t;
 
-/* Boot-time initialization only; repeated calls never reset running workers. */
-void tasksInitData(void);
 /* Start configured workers once. Return the first error, but try every worker. */
 rt_err_t tasksInit(void);
 /* Copy a consistent startup snapshot. Live thread state is shown by `ps`. */
-rt_err_t tasksGetStatus(taskId_e taskId, task_status_t *status);
+rt_err_t tasksGetStatus(taskid_e taskId, task_status_t *status);
 
 #endif
