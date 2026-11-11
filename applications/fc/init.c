@@ -3,7 +3,7 @@
  * @Author       : JiaVerso
  * @Date         : 2026-11-05 20:54:16
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-09 10:48:55
+ * @LastEditTime: 2026-11-11 17:22:10
  * @FilePath     : /FyPilot/applications/fc/init.c
  * @Description  : 改为当前 BSP 的应用初始化入口.
  */
@@ -14,13 +14,14 @@
 
 #include "init.h"
 #include "tasks.h"
+#include "SEGGER_RTT.h"
 
 rt_err_t fc_init(void)
 {
-    rt_kprintf("\n-- STM32H743VIH6 standalone FyPilot --\n");
-    rt_kprintf("HSE=8MHz CPU=%uHz, console uart3 PD8/PD9 115200 8N1\n", SystemCoreClock);
-    rt_kprintf("Board bringup: ESC signal pins remain pulled-down inputs on testing time.\n");
-    
+    SEGGER_RTT_printf(0, "\n-- STM32H743VIH6 standalone FyPilot --\n");
+    SEGGER_RTT_printf(0, "HSE=8MHz CPU=%uHz, console uart3 PD8/PD9 115200 8N1\n", SystemCoreClock);
+    SEGGER_RTT_printf(0, "Board bringup: ESC signal pins remain pulled-down inputs on testing time.\n");
+
     rt_err_t result = tasksInit();
     
     rt_kprintf("All threads have finished initialization.\n");

@@ -48,6 +48,8 @@
  ****************************************************************************/
 
 /*! @name  Global array that stores the configuration file of BMI270 */
+/*! @note  上传到 BMI270 芯片内部的配置数据
+ */
 const uint8_t bmi270_config_file[] = {
     0xc8, 0x2e, 0x00, 0x2e, 0x80, 0x2e, 0x3d, 0xb1, 0xc8, 0x2e, 0x00, 0x2e, 0x80, 0x2e, 0x91, 0x03, 0x80, 0x2e, 0xbc,
     0xb0, 0x80, 0x2e, 0xa3, 0x03, 0xc8, 0x2e, 0x00, 0x2e, 0x80, 0x2e, 0x00, 0xb0, 0x50, 0x30, 0x21, 0x2e, 0x59, 0xf5,
@@ -1350,6 +1352,7 @@ static int8_t disable_sensor_features(uint64_t sensor_sel, struct bmi2_dev *dev)
  *  3) Writes the configuration file.
  *  4) Updates the feature offset parameters in the device structure.
  *  5) Updates the maximum number of pages, in the device structure.
+ *  -- 设置 BMI270 的芯片 ID、配置数据地址、型号相关的功能信息，然后调用 bmi2.c 完成底层初始化
  */
 int8_t bmi270_init(struct bmi2_dev *dev)
 {

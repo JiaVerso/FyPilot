@@ -1,3 +1,11 @@
+'''
+Author: Jack Shaw 2870998241@qq.com
+Date: 2026-11-05 20:54:16
+LastEditors: Jack Shaw 2870998241@qq.com
+LastEditTime: 2026-11-09 13:58:47
+FilePath: /FyPilot/bsp/stm32h743/SConstruct
+Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+'''
 import os
 import sys
 import rtconfig
@@ -26,7 +34,6 @@ objs = PrepareBuilding(env, RTT_ROOT, has_libcpu=False)
 objs += SConscript(os.path.join(BSP_ROOT, '../../applications/SConscript'), variant_dir='build/applications', duplicate=0)
 objs += SConscript(os.path.join(BSP_ROOT, '../../drivers/SConscript'), variant_dir='build/drivers', duplicate=0)
 objs += SConscript(os.path.join(SDK_ROOT, 'stm32/SConscript'), variant_dir='build/sdk/stm32', duplicate=0)
-objs += SConscript(os.path.join(SDK_ROOT, 'bmi270/SConscript'), variant_dir='build/sdk/bmi270', duplicate=0)
 objs += SConscript(os.path.join(BSP_ROOT, '../../tools/SConscript'),variant_dir='build/tools',duplicate=0,)
 
 if not GetDepend('BSP_USING_HELLO_WORLD'):

@@ -315,6 +315,7 @@ int8_t bmi2_get_i2c_wdt_sel(uint8_t *watchdog_select, struct bmi2_dev *dev);
  * @retval 0 -> Success
  * @retval < 0 -> Fail
  */
+ /* 读取寄存器 */
 int8_t bmi2_get_regs(uint8_t reg_addr, uint8_t *data, uint16_t len, struct bmi2_dev *dev);
 
 /*!
@@ -335,6 +336,7 @@ int8_t bmi2_get_regs(uint8_t reg_addr, uint8_t *data, uint16_t len, struct bmi2_
  * @retval 0 -> Success
  * @retval < 0 -> Fail
  */
+ /* 写入寄存器 */
 int8_t bmi2_set_regs(uint8_t reg_addr, const uint8_t *data, uint16_t len, struct bmi2_dev *dev);
 
 /**
@@ -361,6 +363,7 @@ int8_t bmi2_set_regs(uint8_t reg_addr, const uint8_t *data, uint16_t len, struct
  * @retval 0 -> Success
  * @retval < 0 -> Fail
  */
+ /* 软复位 */
 int8_t bmi2_soft_reset(struct bmi2_dev *dev);
 
 /**
@@ -385,6 +388,7 @@ int8_t bmi2_soft_reset(struct bmi2_dev *dev);
  * @retval 0 -> Success
  * @retval < 0 -> Fail
  */
+ /* 读取传感器配置文件版本 */
 int8_t bmi2_get_config_file_version(uint8_t *config_major, uint8_t *config_minor, struct bmi2_dev *dev);
 
 /**
@@ -769,6 +773,7 @@ int8_t bmi2_get_feature_data(struct bmi2_feat_sensor_data *feat_sensor_data, uin
  * @retval 0 -> Success
  * @retval < 0 -> Fail
  */
+ /* 读取传感器数据 */
 int8_t bmi2_get_sensor_data(struct bmi2_sens_data *data, struct bmi2_dev *dev);
 
 /**

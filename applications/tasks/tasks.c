@@ -2,7 +2,7 @@
  * @Author: Jack Shaw 2870998241@qq.com
  * @Date: 2026-11-05 20:45:56
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-09 10:48:03
+ * @LastEditTime: 2026-11-11 17:20:33
  * @FilePath: /FyPilot/applications/tasks/tasks.c
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -36,8 +36,6 @@
 #include "imu_task.h"
 #endif
 
-typedef rt_err_t (*task_start_func)(void);
-
 /* Reuse each module's worker; do not create a second UART or SPI reader. */
 static const task_definition_t taskDefinitions[TASK_COUNT] =
     {
@@ -45,22 +43,20 @@ static const task_definition_t taskDefinitions[TASK_COUNT] =
 #ifdef BSP_USING_CRSF
                      crsf_receiver_start
 #else
-                     RT_NULL
+                     NULL
 #endif
         },
         [TASK_IMU] = {"imu", "BMI270 DRDY / 10 ms fallback",
 #ifdef BSP_USING_BMI270
                       mp_bmi270_start
 #else
-                      RT_NULL
+                      NULL
 #endif
-        },
-        [TASK_FLIGHT] = {FLIGHT_THREAD_NAME, "periodic diagnostic loop", fypilot_flight_start}
+        }
     };
 
 static task_status_t taskStatus[TASK_COUNT];
 static rt_bool_t dataInitialized;
-static rt_bool_t initAttempted;
 
 static void tasksInitData(void)
 {

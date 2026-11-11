@@ -10,7 +10,7 @@
 #include <math.h>
 #include <string.h>
 
-static struct rt_spi_device spi;
+static struct rt_spi_device imu_spi;
 static struct bmi2_dev bmi;
 static rt_bool_t attached;
 static rt_bool_t ready;
@@ -45,32 +45,44 @@ static rt_err_t configure_spi(uint32_t hz)
     cfg.data_width = 8;
     cfg.mode = RT_SPI_MASTER | RT_SPI_MODE_3 | RT_SPI_MSB;
     cfg.max_hz = hz;
-    return rt_spi_configure(&spi, &cfg);
+    return rt_spi_configure(&imu_spi, &cfg);
 }
-int aopa_bmi270_last_error(void) { return last_error; }
 
-rt_err_t aopa_bmi270_init(void)
+int mp_bmi270_last_error(void) 
+{ 
+    return last_error; 
+}
+
+/* Values ​​required for configuring sensor registers, along with their corresponding function pointers */
+rt_err_t mp_bmi270_init(void)
 {
     uint8_t sensors[] = {BMI2_ACCEL, BMI2_GYRO};
-    struct bmi2_sens_config cfg[2] = {{0}};
+    struct bmi2_sens_config cfg[2] = {{0},{0}};
     struct bmi2_int_pin_config pin = {0};
     int8_t rc;
     ready = RT_FALSE;
     if (!attached)
     {
-        rt_err_t err = rt_spi_bus_attach_device_cspin(&spi, AOPA_IMU_DEVICE,
-            AOPA_IMU_BUS, AOPA_IMU_CS, RT_NULL);
-        if (err != RT_EOK)
+        /* 把 BMI270 挂到 RT-Thread 的 SPI 总线上 */
+        rt_err_t err = rt_spi_bus_attach_device_cspin(&imu_spi, MP_IMU_DEVICE,
+            MP_IMU_BUS, MP_IMU_CS, RT_NULL);
+
+        if (err != RT_EOK) {
+            rt_kprintf("Failed to attach BMI270 to SPI bus: %d\n", err);
             return err;
+        }
         attached = RT_TRUE;
-        rt_pin_write(AOPA_IMU_CS, PIN_HIGH);
+
+        /* 拉高片选引脚 */
+        rt_pin_write(MP_IMU_CS, PIN_HIGH);
     }
     if (configure_spi(1000000U) != RT_EOK)
         return -RT_EIO;
+
     rt_thread_mdelay(10);
     memset(&bmi, 0, sizeof(bmi));
     bmi.intf = BMI2_SPI_INTF;
-    bmi.intf_ptr = &spi;
+    bmi.intf_ptr = &imu_spi;
     bmi.read = spi_read;
     bmi.write = spi_write;
     bmi.delay_us = delay_us;
@@ -81,17 +93,20 @@ rt_err_t aopa_bmi270_init(void)
     rc = bmi2_set_adv_power_save(BMI2_DISABLE, &bmi);
     if (rc != BMI2_OK)
         goto fail;
+
     cfg[0].type = BMI2_ACCEL;
     cfg[1].type = BMI2_GYRO;
     rc = bmi2_get_sensor_config(cfg, 2, &bmi);
     if (rc != BMI2_OK)
         goto fail;
+
     /* BF uses +/-16g and +/-2000 dps. Use 800 Hz for initial board bringup;
      * this is not BF's 3.2 kHz gyro/FIFO control-loop configuration. */
     cfg[0].cfg.acc.odr = BMI2_ACC_ODR_800HZ;
     cfg[0].cfg.acc.range = BMI2_ACC_RANGE_16G;
     cfg[0].cfg.acc.bwp = BMI2_ACC_NORMAL_AVG4;
     cfg[0].cfg.acc.filter_perf = BMI2_PERF_OPT_MODE;
+
     cfg[1].cfg.gyr.odr = BMI2_GYR_ODR_800HZ;
     cfg[1].cfg.gyr.range = BMI2_GYR_RANGE_2000;
     cfg[1].cfg.gyr.bwp = BMI2_GYR_NORMAL_MODE;
@@ -100,6 +115,7 @@ rt_err_t aopa_bmi270_init(void)
     rc = bmi2_set_sensor_config(cfg, 2, &bmi);
     if (rc != BMI2_OK)
         goto fail;
+
     pin.pin_type = BMI2_INT1;
     pin.int_latch = BMI2_INT_NON_LATCH;
     pin.pin_cfg[0].lvl = BMI2_INT_ACTIVE_HIGH;
@@ -127,7 +143,7 @@ fail:
     return -RT_EIO;
 }
 
-rt_err_t aopa_bmi270_read(flight_imu_sample_t *sample)
+rt_err_t mp_bmi270_read(flight_imu_sample_t *sample)
 {
     struct bmi2_sens_data data = {0};
     int8_t rc;

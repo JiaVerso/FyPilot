@@ -48,7 +48,7 @@ rt_err_t crsf_receiver_start(void)
 {
     if (started)
         return -RT_EBUSY;
-    serial = rt_device_find(AOPA_CRSF_DEVICE);
+    serial = rt_device_find(MP_CRSF_DEVICE);
     if (serial == RT_NULL)
         return -RT_ENOSYS;
     if (serial->ref_count != 0u)

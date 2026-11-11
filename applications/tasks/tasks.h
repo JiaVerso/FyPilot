@@ -2,7 +2,7 @@
  * @Author: Jack Shaw 2870998241@qq.com
  * @Date: 2026-11-05 20:45:56
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-09 10:37:36
+ * @LastEditTime: 2026-11-09 14:00:22
  * @FilePath: /FyPilot/applications/tasks/tasks.h
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -13,6 +13,8 @@
 #define FYPILOT_TASKS_H
 
 #include <rtthread.h>
+
+typedef rt_err_t (*task_start_func)(void);
 
 typedef enum
 {
