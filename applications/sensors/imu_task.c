@@ -36,7 +36,7 @@ static void mp_imu_entry(void *parameter)
             ++coalesced; /* latest register values, not an invented FIFO sample */
         err = mp_bmi270_read(&sample);
         if (err == RT_EOK)
-        {
+        { 
             sample.sequence = ++sample_count;
             /* 进入临界区 */
             rt_base_t level = rt_hw_interrupt_disable();
