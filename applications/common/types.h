@@ -1,3 +1,11 @@
+/*
+ * @Author: Jack Shaw 2870998241@qq.com
+ * @Date: 2026-11-05 21:03:44
+ * @LastEditors: Jack Shaw 2870998241@qq.com
+ * @LastEditTime: 2026-11-16 14:39:53
+ * @FilePath: /FyPilot/applications/common/types.h
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 #ifndef FYPILOT_FLIGHT_TYPES_H
 #define FYPILOT_FLIGHT_TYPES_H
 
@@ -26,17 +34,15 @@ typedef struct
     float yaw;
 } flight_euler_t;
 
-typedef struct
+typedef struct flight_imu_sample_s
 {
     uint64_t timestamp_us;
-    flight_vector3f_t gyro_rad_s;
-    flight_vector3f_t accel_m_s2;
-    flight_vector3f_t mag_gauss;
+    flight_vector3f_t gyro;
+    flight_vector3f_t accel;
     float temperature_c;
     uint32_t sequence;
     bool gyro_valid;
     bool accel_valid;
-    bool mag_valid;
 } flight_imu_sample_t;
 
 typedef struct

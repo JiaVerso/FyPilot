@@ -10,10 +10,14 @@
 
 static struct rt_thread imu_thread;
 static struct rt_semaphore imu_data_ready;
-rt_align(RT_ALIGN_SIZE) static rt_uint8_t imu_stack[4096];
+static rt_uint8_t imu_stack[4096];
+
 static flight_imu_sample_t latest;
 static rt_bool_t started;
 static rt_uint32_t irq_count = 0, sample_count, error_count, poll_count, coalesced;
+
+/* 队列丢包数 */
+static rt_uint32_t queue_drop_count = 0;
 
 static void imu_isr(void *args)
 {
@@ -21,6 +25,7 @@ static void imu_isr(void *args)
     ++irq_count;
     rt_sem_release(&imu_data_ready);
 }
+
 static void mp_imu_entry(void *parameter)
 {
     (void)parameter;
@@ -42,8 +47,13 @@ static void mp_imu_entry(void *parameter)
             rt_base_t level = rt_hw_interrupt_disable();
             latest = sample;
             rt_hw_interrupt_enable(level);
+
+            rt_err_t mq_err = rt_mq_send(mp_imu_mq(), &sample, sizeof(sample));
+            if (mq_err != RT_EOK) {
+                ++queue_drop_count;
+            }
             
-                    /* 每 100 ms 输出一次，约 10 Hz */
+            /* 每 100 ms 输出一次，约 10 Hz */
             static uint32_t last_log_ms;
             uint32_t now_ms = mp_time_now_ms();
 
@@ -53,14 +63,13 @@ static void mp_imu_entry(void *parameter)
 
                 SEGGER_RTT_printf(
                     0,
-                    "IMU #%u gyro[mrad/s]=%d,%d,%d acc[mm/s2]=%d,%d,%d\n",
-                    (unsigned)sample.sequence,
-                    (int)(sample.gyro_rad_s.x * 1000.0f),
-                    (int)(sample.gyro_rad_s.y * 1000.0f),
-                    (int)(sample.gyro_rad_s.z * 1000.0f),
-                    (int)(sample.accel_m_s2.x * 1000.0f),
-                    (int)(sample.accel_m_s2.y * 1000.0f),
-                    (int)(sample.accel_m_s2.z * 1000.0f)
+                    "IMU # gyro[mrad/s]=%f,%f,%f acc[mm/s2]=%f,%f,%f\n",
+                    (float)(sample.gyro.x),
+                    (float)(sample.gyro.y),
+                    (float)(sample.gyro.z),
+                    (float)(sample.accel.x),
+                    (float)(sample.accel.y),
+                    (float)(sample.accel.z)
                 );
             }
             
@@ -150,9 +159,9 @@ static void mp_imu(int argc, char **argv)
     rt_kprintf("age=%u us gyro_valid=%u accel_valid=%u\n",
                (rt_uint32_t)(mp_time_now_us() - copy.timestamp_us), copy.gyro_valid, copy.accel_valid);
     rt_kprintf("gyro [mrad/s] %d %d %d; acc [mm/s2] %d %d %d\n",
-               (int)(copy.gyro_rad_s.x * 1000), (int)(copy.gyro_rad_s.y * 1000),
-               (int)(copy.gyro_rad_s.z * 1000), (int)(copy.accel_m_s2.x * 1000),
-               (int)(copy.accel_m_s2.y * 1000), (int)(copy.accel_m_s2.z * 1000));
+               (int)(copy.gyro.x * 1000), (int)(copy.gyro.y * 1000),
+               (int)(copy.gyro.z * 1000), (int)(copy.accel.x * 1000),
+               (int)(copy.accel.y * 1000), (int)(copy.accel.z * 1000));
 }
 
 MSH_CMD_EXPORT(mp_imu, Show latest real BMI270 sample and interrupt diagnostics);

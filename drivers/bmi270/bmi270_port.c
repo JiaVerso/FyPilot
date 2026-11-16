@@ -150,28 +150,38 @@ rt_err_t mp_bmi270_read(flight_imu_sample_t *sample)
     if (!ready || sample == RT_NULL)
         return -RT_EINVAL;
     const uint64_t timestamp = mp_time_now_us();
+
     rc = bmi2_get_sensor_data(&data, &bmi);
     if (rc != BMI2_OK)
     {
         last_error = rc;
         return -RT_EIO;
     }
+    /* 检查是否有新数据 */
     if (!(data.status & (BMI2_DRDY_GYR | BMI2_DRDY_ACC)))
         return -RT_EEMPTY;
-    memset(sample, 0, sizeof(*sample));
-    sample->timestamp_us = timestamp;
-    /* CW0_DEG is retained as identity; confirm the assembled sensor axes. */
-    const float accel_scale = 16.0f * 9.80665f / 32768.0f;
-    const float gyro_scale = 2000.0f * 0.017453292519943295f / 32768.0f;
-    sample->accel_m_s2.x = data.acc.x * accel_scale;
-    sample->accel_m_s2.y = data.acc.y * accel_scale;
-    sample->accel_m_s2.z = data.acc.z * accel_scale;
-    sample->gyro_rad_s.x = data.gyr.x * gyro_scale;
-    sample->gyro_rad_s.y = data.gyr.y * gyro_scale;
-    sample->gyro_rad_s.z = data.gyr.z * gyro_scale;
-    sample->accel_valid = (data.status & BMI2_DRDY_ACC) != 0;
-    sample->gyro_valid = (data.status & BMI2_DRDY_GYR) != 0;
-    sample->temperature_c = NAN; /* temperature not sampled in the fast path */
-    last_error = BMI2_OK;
-    return RT_EOK;
+
+    if (data.gyro_valid == true && data.accel_valid == true) {
+        
+        memset(sample, 0, sizeof(*sample));
+        sample->timestamp_us = timestamp;
+
+        /* 原始读数转换成物理单位 (±16 g 量程) */
+        const float accel_scale = 16.0f * 9.80665f / 32768.0f;
+        /* Gyro (±2000°/s 量程) */
+        const float gyro_scale = 2000.0f * 0.017453292519943295f / 32768.0f;
+        sample->accel.x = data.acc.x * accel_scale;
+        sample->accel.y = data.acc.y * accel_scale;
+        sample->accel.z = data.acc.z * accel_scale;
+        sample->gyro.x = data.gyr.x * gyro_scale;
+        sample->gyro.y = data.gyr.y * gyro_scale;
+        sample->gyro.z = data.gyr.z * gyro_scale;
+        sample->accel_valid = (data.status & BMI2_DRDY_ACC) != 0;
+        sample->gyro_valid = (data.status & BMI2_DRDY_GYR) != 0;
+        sample->temperature_c = NAN; /* temperature not sampled in the fast path */
+        last_error = BMI2_OK;
+        return RT_EOK;
+    } else {
+        return -RT_EEMPTY;
+    }
 }

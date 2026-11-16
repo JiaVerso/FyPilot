@@ -2,26 +2,9 @@
  * @Author: Jack Shaw 2870998241@qq.com
  * @Date: 2026-11-05 20:45:56
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-11 17:20:33
+ * @LastEditTime: 2026-11-16 16:51:47
  * @FilePath: /FyPilot/applications/tasks/tasks.c
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
- */
-/*
- * @Author: Jack Shaw 2870998241@qq.com
- * @Date: 2026-11-05 20:45:56
- * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-09 10:35:53
- * @FilePath: /FyPilot/applications/tasks/tasks.c
- * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
- */
-/*
- * File          : tasks.c
- * @Author       : JiaVerso
- * @Date         : 2026-11-05 20:54:16
- * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-09 10:30:41
- * @FilePath     : /FyPilot/applications/fc/tasks.c
- * @Description  : 统一启动 CRSF、BMI270 和主循环线程
  */
 
 #include "tasks.h"
@@ -43,16 +26,23 @@ static const task_definition_t taskDefinitions[TASK_COUNT] =
 #ifdef BSP_USING_CRSF
                      crsf_receiver_start
 #else
-                     NULL
+                    RT_NULL
 #endif
         },
         [TASK_IMU] = {"imu", "BMI270 DRDY / 10 ms fallback",
 #ifdef BSP_USING_BMI270
                       mp_bmi270_start
 #else
-                      NULL
+                    RT_NULL
 #endif
-        }
+        },
+        [TASK_ATTITUDE] = {"attitude", "IMU message queue",
+#ifdef BSP_USING_BMI270
+                    mp_attitude_start
+#else
+                    RT_NULL
+#endif
+}
     };
 
 static task_status_t taskStatus[TASK_COUNT];
@@ -98,33 +88,3 @@ rt_err_t tasksInit(void)
     }
     return result;
 }
-
-rt_err_t tasksGetStatus(taskid_e taskId, task_status_t *status)
-{
-    if ((unsigned)taskId >= TASK_COUNT || status == RT_NULL)
-        return -RT_EINVAL;
-    tasksInitData();
-    rt_base_t level = rt_hw_interrupt_disable();
-    *status = taskStatus[taskId];
-    rt_hw_interrupt_enable(level);
-    return RT_EOK;
-}
-
-static void tasks(void)
-{
-    rt_kprintf("name         enabled started result trigger\n");
-    for (unsigned i = 0; i < TASK_COUNT; ++i)
-    {
-        task_status_t status;
-        if (tasksGetStatus((taskid_e)i, &status) == RT_EOK)
-            rt_kprintf("%-12s %7u %7u %6d %s\n", status.name,
-                       (unsigned)status.enabled, (unsigned)status.started,
-                       (int)status.startResult, status.trigger);
-    }
-    rt_kprintf("flight loop=%u Hz count=%u status=%u (diagnostic only)\n",
-               (unsigned)FLIGHT_LOOP_HZ, (unsigned)fypilot_get_loop_count(),
-               (unsigned)fypilot_get_status());
-    rt_kprintf("started is a boot result; use ps for live thread state.\n");
-    rt_kprintf("Attitude/PID/mixer are not connected; ESC outputs remain disabled.\n");
-}
-MSH_CMD_EXPORT(tasks, Show FyPilot task startup results and loop counter);

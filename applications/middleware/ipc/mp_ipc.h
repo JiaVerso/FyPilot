@@ -1,23 +1,24 @@
 /*
+ * @Author: Jack Shaw 2870998241@qq.com
+ * @Date: 2026-11-05 20:45:56
+ * @LastEditors: Jack Shaw 2870998241@qq.com
+ * @LastEditTime: 2026-11-16 14:28:42
+ * @FilePath: /FyPilot/applications/middleware/ipc/mp_ipc.h
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
+/*
  * IPC objects and message types used by FyPilot.
  */
 #ifndef MP_IPC_H
 #define MP_IPC_H
 
 #include <rtthread.h>
+#include "types.h"
 
 /* RT-Thread v5.x uses zero as the non-blocking timeout. */
 #ifndef RT_TICK_NONE
 #define RT_TICK_NONE 0
 #endif
-
-typedef struct imu_sample
-{
-    rt_uint64_t timestamp_us;
-    float accel[3];
-    float gyro[3];
-    rt_uint32_t sequence;
-} imu_sample_t;
 
 typedef struct attitude_state
 {

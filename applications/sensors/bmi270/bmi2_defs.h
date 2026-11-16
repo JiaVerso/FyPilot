@@ -49,6 +49,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 #endif
 
 /******************************************************************************/
@@ -1992,6 +1993,10 @@ struct bmi2_sens_data
 
     /*! Status register data */
     uint8_t status;
+
+    bool gyro_valid;
+    bool accel_valid;
+
 };
 
 /*!

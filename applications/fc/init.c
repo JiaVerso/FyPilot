@@ -3,7 +3,7 @@
  * @Author       : JiaVerso
  * @Date         : 2026-11-05 20:54:16
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-11 17:22:10
+ * @LastEditTime: 2026-11-16 15:35:29
  * @FilePath     : /FyPilot/applications/fc/init.c
  * @Description  : 改为当前 BSP 的应用初始化入口.
  */
@@ -22,6 +22,7 @@ rt_err_t fc_init(void)
     SEGGER_RTT_printf(0, "HSE=8MHz CPU=%uHz, console uart3 PD8/PD9 115200 8N1\n", SystemCoreClock);
     SEGGER_RTT_printf(0, "Board bringup: ESC signal pins remain pulled-down inputs on testing time.\n");
 
+    rt_err_t err = mp_ipc_init();
     rt_err_t result = tasksInit();
     
     rt_kprintf("All threads have finished initialization.\n");
