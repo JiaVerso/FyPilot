@@ -2,7 +2,7 @@
  * @Author: Jack Shaw 2870998241@qq.com
  * @Date: 2026-11-16 15:23:48
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-16 17:08:09
+ * @LastEditTime: 2026-11-16 17:29:18
  * @FilePath: /FyPilot/applications/sensors/ekf_task.c
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -52,7 +52,7 @@ static void mp_attitude_entry(void *parameter)
         previous_us = sample.timestamp_us;
         previous_sequence = sample.sequence;
 
-        /* 微秒转换成秒，使用采样时间戳，而非线程唤醒间隔。 */
+        /* 陀螺仪(rad/s)，统一时间单位 */
         float dt = (float)delay_us * 1.0e-6f;
 
         bool updated = IMU_QuaternionEKF_UpdateInstance(
@@ -68,6 +68,24 @@ static void mp_attitude_entry(void *parameter)
 
         if (!updated)
             continue;
+        else
+        {
+            /* 输出姿态角 */
+            static uint32_t last_log_ms;
+            uint32_t now_ms = mp_time_now_ms();
+
+            if ((uint32_t)(now_ms - last_log_ms) >= 100U)
+            {
+                last_log_ms = now_ms;
+                SEGGER_RTT_printf(
+                    0,
+                    "attitude: roll=%.2f, pitch=%.2f, yaw=%.2f\n",
+                    qe->Roll,
+                    qe->Pitch,
+                    qe->Yaw
+                );
+            }
+        }
     }
 }
 

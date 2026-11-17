@@ -3,7 +3,7 @@
  * @Author       : JiaVerso
  * @Date         : 2026-11-05 20:54:16
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-16 15:35:29
+ * @LastEditTime: 2026-11-17 18:42:32
  * @FilePath     : /FyPilot/applications/fc/init.c
  * @Description  : 改为当前 BSP 的应用初始化入口.
  */
@@ -14,6 +14,7 @@
 
 #include "init.h"
 #include "tasks.h"
+#include "mp_ipc.h"
 #include "SEGGER_RTT.h"
 
 rt_err_t fc_init(void)
@@ -24,7 +25,11 @@ rt_err_t fc_init(void)
 
     rt_err_t err = mp_ipc_init();
     rt_err_t result = tasksInit();
-    
+    if (err != RT_EOK || result != RT_EOK)
+    {
+        rt_kprintf("Initialization failed.\n");
+        return -RT_ERROR;
+    }
     rt_kprintf("All threads have finished initialization.\n");
 
 #ifdef BSP_USING_CRSF

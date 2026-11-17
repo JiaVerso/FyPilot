@@ -2,7 +2,7 @@
  * @Author: Jack Shaw 2870998241@qq.com
  * @Date: 2026-11-05 20:45:56
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-16 16:51:47
+ * @LastEditTime: 2026-11-17 18:26:36
  * @FilePath: /FyPilot/applications/tasks/tasks.c
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -10,6 +10,8 @@
 #include "tasks.h"
 #include "status.h"
 #include "config.h"
+#include "attitude_task.h"
+
 #include <finsh.h>
 #include <rthw.h>
 #ifdef BSP_USING_CRSF

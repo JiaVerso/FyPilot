@@ -3,10 +3,11 @@
 #include "bmi270_port.h"
 #include "target_config.h"
 #include "mp_time.h"
+#include "SEGGER_RTT.h"
+#include "mp_ipc.h"
 #include <rtdevice.h>
 #include <finsh.h>
 #include <rthw.h>
-#include "SEGGER_RTT.h"
 
 static struct rt_thread imu_thread;
 static struct rt_semaphore imu_data_ready;
@@ -136,32 +137,3 @@ detach_sem:
     rt_sem_detach(&imu_data_ready);
     return err;
 }
-
-
-static void mp_imu(int argc, char **argv)
-{
-    flight_imu_sample_t copy;
-    rt_uint32_t irqs, count, errors, polls, skipped;
-    (void)argc;
-    (void)argv;
-    rt_base_t level = rt_hw_interrupt_disable();
-    copy = latest;
-    irqs = irq_count;
-    count = sample_count;
-    errors = error_count;
-    polls = poll_count;
-    skipped = coalesced;
-    rt_hw_interrupt_enable(level);
-    rt_kprintf("BMI270 started=%u samples=%u irq=%u errors=%u polls=%u coalesced=%u api=%d\n",
-               started, count, irqs, errors, polls, skipped, mp_bmi270_last_error());
-    if (!count)
-        return;
-    rt_kprintf("age=%u us gyro_valid=%u accel_valid=%u\n",
-               (rt_uint32_t)(mp_time_now_us() - copy.timestamp_us), copy.gyro_valid, copy.accel_valid);
-    rt_kprintf("gyro [mrad/s] %d %d %d; acc [mm/s2] %d %d %d\n",
-               (int)(copy.gyro.x * 1000), (int)(copy.gyro.y * 1000),
-               (int)(copy.gyro.z * 1000), (int)(copy.accel.x * 1000),
-               (int)(copy.accel.y * 1000), (int)(copy.accel.z * 1000));
-}
-
-MSH_CMD_EXPORT(mp_imu, Show latest real BMI270 sample and interrupt diagnostics);

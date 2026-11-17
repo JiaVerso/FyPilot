@@ -1,16 +1,17 @@
+
 import os
 from building import *
 
 cwd = GetCurrentDir()
 # Select native RT-Thread workers explicitly; unfinished BF modules stay inactive.
-src = ['main.c', 'fc/init.c', 'fc/flight_app.c', 'tasks/tasks.c']
+src = ['main.c', 'fc/init.c', 'fc/flight_app.c', 'tasks/tasks.c', 'middleware/ipc/mp_ipc.c']
 
 if GetDepend('BSP_USING_CRSF'):
     src += ['elrs/crsf_parser.c', 'elrs/receiver_crsf.c']
 
 if GetDepend('BSP_USING_BMI270'):
     src += ['sensors/imu_task.c', 'platform/mp_time.c', 'sensors/bmi270/bmi270.c',
-        'sensors/bmi270/bmi2.c']
+        'sensors/bmi270/bmi2.c', 'sensors/attitude_task.c']
 
 if not GetDepend('BSP_USING_HELLO_WORLD'):
     src += ['platform/mp_os.c', 'common/math/my_math.c', 'common/buffer/buffer.c']
@@ -20,7 +21,7 @@ if not GetDepend('BSP_USING_HELLO_WORLD'):
 
 paths = [cwd] + [os.path.join(cwd, name) for name in
     ('fc', 'elrs', 'sensors', 'sensors/bmi270', 'platform', 'common', 'common/math',
-     'common/buffer', 'include', 'tasks')]
+     'common/buffer', 'include', 'tasks', 'middleware/ipc')]
 
 objs = DefineGroup('FyPilot flight modules', src, depend=[''], CPPPATH=paths,
                    LOCAL_CFLAGS=' -Wextra -Wno-cast-function-type')
