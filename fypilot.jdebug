@@ -35,6 +35,7 @@ void OnProjectLoad (void) {
   //
   // User settings
   //
+  Edit.SysVar (VAR_HSS_SPEED, FREQ_100_HZ);
   File.Open ("$(ProjectDir)/bsp/stm32h743/build/fypilot.elf");
 }
 

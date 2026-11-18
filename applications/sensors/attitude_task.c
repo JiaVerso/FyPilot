@@ -2,19 +2,20 @@
  * @Author: Jack Shaw 2870998241@qq.com
  * @Date: 2026-11-16 15:23:48
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-16 17:29:18
+ * @LastEditTime: 2026-11-18 11:51:31
  * @FilePath: /FyPilot/applications/sensors/ekf_task.c
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
-#include <rtthread.h>
+#include "attitude_task.h"
 #include "mp_ipc.h"
+#include "mp_time.h"
 #include "QuaternionEKF.h"
+#include "SEGGER_RTT.h"
 
 static QEKF_INS_t qe;
-static rt_thread_t att_thread;
-static uint8_t attitude_stack[2048];
-
-flight_imu_sample_t sample;
+static struct rt_thread att_thread;
+rt_align(RT_ALIGN_SIZE) static uint8_t attitude_stack[2048];
+static bool started;
 
 static void mp_attitude_entry(void *parameter)
 {
@@ -22,9 +23,11 @@ static void mp_attitude_entry(void *parameter)
 
     uint64_t previous_us = 0;
     uint32_t previous_sequence = 0;
+    bool have_previous = false;
 
     while (1)
     {
+        flight_imu_sample_t sample;
         rt_ssize_t received = rt_mq_recv(
             mp_imu_mq(),
             &sample,
@@ -39,11 +42,12 @@ static void mp_attitude_entry(void *parameter)
         }
 
         /* 建立时间戳基准 */
-        if (sample.timestamp_us <= previous_us ||
+        if (!have_previous || sample.timestamp_us <= previous_us ||
             (uint32_t)(sample.sequence - previous_sequence) != 1U)
         {
             previous_us = sample.timestamp_us;
             previous_sequence = sample.sequence;
+            have_previous = true;
             continue;
         }
 
@@ -79,20 +83,20 @@ static void mp_attitude_entry(void *parameter)
                 last_log_ms = now_ms;
                 SEGGER_RTT_printf(
                     0,
-                    "attitude: roll=%.2f, pitch=%.2f, yaw=%.2f\n",
-                    qe->Roll,
-                    qe->Pitch,
-                    qe->Yaw
+                    /* SEGGER's compact formatter does not support %f. */
+                    "attitude[mdeg]: roll=%d pitch=%d yaw=%d\n",
+                    (int)(qe->Roll * 1000.0f),
+                    (int)(qe->Pitch * 1000.0f),
+                    (int)(qe->Yaw * 1000.0f)
                 );
             }
         }
     }
 }
 
-rt_err_t mp_attitude_start()
+rt_err_t mp_attitude_start(void)
 {
-    
-    if (att_thread != RT_NULL)
+    if (started)
         return -RT_EBUSY;
 
     bool initialized = IMU_QuaternionEKF_InitInstance(
@@ -105,15 +109,26 @@ rt_err_t mp_attitude_start()
         0.0f            /* 加速度低通时间常数 */
     );
 
-    rt_err_t err = rt_thread_init(&att_thread , "mp_attitude", mp_attitude_entry, &qe,
+    if (!initialized)
+        return -RT_ENOMEM;
+
+    rt_err_t err = rt_thread_init(&att_thread, "mp_attitude", mp_attitude_entry, &qe,
                    attitude_stack, sizeof(attitude_stack), 6, 1);
 
-    err = rt_thread_startup(att_thread);
     if (err != RT_EOK)
     {
-        rt_thread_detach(att_thread);
+        IMU_QuaternionEKF_DeinitInstance(&qe);
         return err;
     }
 
+    err = rt_thread_startup(&att_thread);
+    if (err != RT_EOK)
+    {
+        rt_thread_detach(&att_thread);
+        IMU_QuaternionEKF_DeinitInstance(&qe);
+        return err;
+    }
+
+    started = true;
     return RT_EOK;
 }

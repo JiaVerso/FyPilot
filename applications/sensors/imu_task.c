@@ -54,25 +54,25 @@ static void mp_imu_entry(void *parameter)
                 ++queue_drop_count;
             }
             
-            /* 每 100 ms 输出一次，约 10 Hz */
-            static uint32_t last_log_ms;
-            uint32_t now_ms = mp_time_now_ms();
+            // /* 每 100 ms 输出一次，约 10 Hz */
+            // static uint32_t last_log_ms;
+            // uint32_t now_ms = mp_time_now_ms();
 
-            if ((uint32_t)(now_ms - last_log_ms) >= 100U)
-            {
-                last_log_ms = now_ms;
+            // if ((uint32_t)(now_ms - last_log_ms) >= 100U)
+            // {
+            //     last_log_ms = now_ms;
 
-                SEGGER_RTT_printf(
-                    0,
-                    "IMU # gyro[mrad/s]=%f,%f,%f acc[mm/s2]=%f,%f,%f\n",
-                    (float)(sample.gyro.x),
-                    (float)(sample.gyro.y),
-                    (float)(sample.gyro.z),
-                    (float)(sample.accel.x),
-                    (float)(sample.accel.y),
-                    (float)(sample.accel.z)
-                );
-            }
+            //     SEGGER_RTT_printf(
+            //         0,
+            //         "IMU # gyro[mrad/s]=%f,%f,%f acc[mm/s2]=%f,%f,%f\n",
+            //         (float)(sample.gyro.x),
+            //         (float)(sample.gyro.y),
+            //         (float)(sample.gyro.z),
+            //         (float)(sample.accel.x),
+            //         (float)(sample.accel.y),
+            //         (float)(sample.accel.z)
+            //     );
+            // }
             
         }
         else if (err != -RT_EEMPTY)

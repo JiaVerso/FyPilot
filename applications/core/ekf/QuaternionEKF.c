@@ -40,6 +40,11 @@ static void IMU_QuaternionEKF_SetH(kalman_filter_t *kf);
 static void IMU_QuaternionEKF_xhatUpdate(kalman_filter_t *kf);
 static void IMU_QuaternionEKF_P_PostProcess(kalman_filter_t *kf);
 
+static QEKF_INS_t *qe_from_kf(kalman_filter_t *kf)
+{
+    return kf != NULL ? (QEKF_INS_t *)kf->UserData : NULL;
+}
+
  /* 初始化内存堆 */ 
 static void *kf_alloc(size_t count, size_t element_size)
 {
@@ -197,33 +202,33 @@ void Kalman_Filter_Init(kalman_filter_t *kf,
         return;
     }
 
-    (void)Matrix_Init(&kf->xhat, xhatSize, 1, kf->xhat_data);
-    (void)Matrix_Init(&kf->xhatminus, xhatSize, 1, kf->xhatminus_data);
+    (void)my_matrix_init(&kf->xhat, xhatSize, 1, kf->xhat_data);
+    (void)my_matrix_init(&kf->xhatminus, xhatSize, 1, kf->xhatminus_data);
     if (uSize > 0) {
-        (void)Matrix_Init(&kf->u, uSize, 1, kf->u_data);
-        (void)Matrix_Init(&kf->B, xhatSize, uSize, kf->B_data);
+        (void)my_matrix_init(&kf->u, uSize, 1, kf->u_data);
+        (void)my_matrix_init(&kf->B, xhatSize, uSize, kf->B_data);
     }
-    (void)Matrix_Init(&kf->z, zSize, 1, kf->z_data);
-    (void)Matrix_Init(&kf->P, xhatSize, xhatSize, kf->P_data);
-    (void)Matrix_Init(&kf->Pminus, xhatSize, xhatSize, kf->Pminus_data);
-    (void)Matrix_Init(&kf->F, xhatSize, xhatSize, kf->F_data);
-    (void)Matrix_Init(&kf->FT, xhatSize, xhatSize, kf->FT_data);
-    (void)Matrix_Init(&kf->H, zSize, xhatSize, kf->H_data);
-    (void)Matrix_Init(&kf->HT, xhatSize, zSize, kf->HT_data);
-    (void)Matrix_Init(&kf->Q, xhatSize, xhatSize, kf->Q_data);
-    (void)Matrix_Init(&kf->R, zSize, zSize, kf->R_data);
-    (void)Matrix_Init(&kf->K, xhatSize, zSize, kf->K_data);
-    (void)Matrix_Init(&kf->S, zSize, zSize, kf->S_data);
-    (void)Matrix_Init(&kf->temp_matrix, xhatSize, xhatSize,
+    (void)my_matrix_init(&kf->z, zSize, 1, kf->z_data);
+    (void)my_matrix_init(&kf->P, xhatSize, xhatSize, kf->P_data);
+    (void)my_matrix_init(&kf->Pminus, xhatSize, xhatSize, kf->Pminus_data);
+    (void)my_matrix_init(&kf->F, xhatSize, xhatSize, kf->F_data);
+    (void)my_matrix_init(&kf->FT, xhatSize, xhatSize, kf->FT_data);
+    (void)my_matrix_init(&kf->H, zSize, xhatSize, kf->H_data);
+    (void)my_matrix_init(&kf->HT, xhatSize, zSize, kf->HT_data);
+    (void)my_matrix_init(&kf->Q, xhatSize, xhatSize, kf->Q_data);
+    (void)my_matrix_init(&kf->R, zSize, zSize, kf->R_data);
+    (void)my_matrix_init(&kf->K, xhatSize, zSize, kf->K_data);
+    (void)my_matrix_init(&kf->S, zSize, zSize, kf->S_data);
+    (void)my_matrix_init(&kf->temp_matrix, xhatSize, xhatSize,
                       kf->temp_matrix_data);
-    (void)Matrix_Init(&kf->temp_matrix1, xhatSize, xhatSize,
+    (void)my_matrix_init(&kf->temp_matrix1, xhatSize, xhatSize,
                       kf->temp_matrix_data1);
-    (void)Matrix_Init(&kf->temp_vector, xhatSize, 1,
+    (void)my_matrix_init(&kf->temp_vector, xhatSize, 1,
                       kf->temp_vector_data);
-    (void)Matrix_Init(&kf->temp_vector1, xhatSize, 1,
+    (void)my_matrix_init(&kf->temp_vector1, xhatSize, 1,
                       kf->temp_vector_data1);
 
-    kf->Initialized = TRUE;
+    kf->Initialized = true;
     kf->MatStatus = MY_MATH_OK;
 }
 
@@ -266,6 +271,42 @@ static void Kalman_Filter_Deinit(kalman_filter_t *kf)
     kf->MatStatus = MY_MATH_ARGUMENT_ERROR;
 }
 
+/* Compact available measurements. MeasurementMap uses one-based state indices. */
+static void H_K_R_Adjustment(kalman_filter_t *kf)
+{
+    uint8_t count = 0;
+    memset(kf->H_data, 0, sizeof(float) * kf->zSize * kf->xhatSize);
+    memset(kf->R_data, 0, sizeof(float) * kf->zSize * kf->zSize);
+
+    for (uint8_t i = 0; i < kf->zSize; ++i) {
+        const uint8_t state = kf->MeasurementMap[i];
+        if (kf->MeasuredVector[i] != 0.0f && state > 0 &&
+            state <= kf->xhatSize) {
+            kf->z_data[count] = kf->MeasuredVector[i];
+            kf->temp[count] = i;
+            kf->H_data[count * kf->xhatSize + state - 1] =
+                kf->MeasurementDegree[i];
+            ++count;
+        }
+    }
+    memset(kf->MeasuredVector, 0, sizeof(float) * kf->zSize);
+    kf->MeasurementValidNum = count;
+    if (count == 0) {
+        return;
+    }
+
+    for (uint8_t i = 0; i < count; ++i) {
+        kf->R_data[i * count + i] =
+            kf->MatR_DiagonalElements[kf->temp[i]];
+    }
+    (void)my_matrix_dimensions(&kf->z, count, 1);
+    (void)my_matrix_dimensions(&kf->H, count, kf->xhatSize);
+    (void)my_matrix_dimensions(&kf->HT, kf->xhatSize, count);
+    (void)my_matrix_dimensions(&kf->R, count, count);
+    (void)my_matrix_dimensions(&kf->S, count, count);
+    (void)my_matrix_dimensions(&kf->K, kf->xhatSize, count);
+}
+
 void Kalman_Filter_Measure(kalman_filter_t *kf)
 {
     if (kf == NULL || !kf->Initialized) {
@@ -294,14 +335,16 @@ static void Kalman_Filter_xhat_Predict(kalman_filter_t *kf)
     }
 
     if (kf->uSize > 0) {
-        kf->MatStatus = Matrix_Multiply(&kf->F, &kf->xhat,
+        (void)my_matrix_dimensions(&kf->temp_vector, kf->xhatSize, 1);
+        (void)my_matrix_dimensions(&kf->temp_vector1, kf->xhatSize, 1);
+        kf->MatStatus = my_matrix_multiply(&kf->F, &kf->xhat,
                                         &kf->temp_vector);
-        kf->MatStatus = Matrix_Multiply(&kf->B, &kf->u,
+        kf->MatStatus = my_matrix_multiply(&kf->B, &kf->u,
                                         &kf->temp_vector1);
-        kf->MatStatus = Matrix_Add(&kf->temp_vector, &kf->temp_vector1,
+        kf->MatStatus = my_matrix_add(&kf->temp_vector, &kf->temp_vector1,
                                    &kf->xhatminus);
     } else {
-        kf->MatStatus = Matrix_Multiply(&kf->F, &kf->xhat,
+        kf->MatStatus = my_matrix_multiply(&kf->F, &kf->xhat,
                                         &kf->xhatminus);
     }
 }
@@ -313,11 +356,12 @@ static void Kalman_Filter_P_Predict(kalman_filter_t *kf)
         return;
     }
 
-    kf->MatStatus = Matrix_Transpose(&kf->F, &kf->FT);
-    kf->MatStatus = Matrix_Multiply(&kf->F, &kf->P, &kf->Pminus);
-    kf->MatStatus = Matrix_Multiply(&kf->Pminus, &kf->FT,
+    (void)my_matrix_dimensions(&kf->temp_matrix, kf->xhatSize, kf->xhatSize);
+    kf->MatStatus = my_matrix_transpose(&kf->F, &kf->FT);
+    kf->MatStatus = my_matrix_multiply(&kf->F, &kf->P, &kf->Pminus);
+    kf->MatStatus = my_matrix_multiply(&kf->Pminus, &kf->FT,
                                     &kf->temp_matrix);
-    kf->MatStatus = Matrix_Add(&kf->temp_matrix, &kf->Q, &kf->Pminus);
+    kf->MatStatus = my_matrix_add(&kf->temp_matrix, &kf->Q, &kf->Pminus);
 }
 
  /* K = P⁻Hᵀ(HP⁻Hᵀ + R)⁻¹ */
@@ -344,6 +388,8 @@ void Kalman_Filter_SetK(kalman_filter_t *kf)
     if (kf->MatStatus != MY_MATH_OK) {
         return;
     }
+    (void)my_matrix_dimensions(&kf->temp_matrix,
+                               kf->Pminus.numRows, kf->HT.numCols);
     kf->MatStatus = my_matrix_multiply(&kf->Pminus, &kf->HT,
                                     &kf->temp_matrix);
     kf->MatStatus = my_matrix_multiply(&kf->temp_matrix, &kf->temp_matrix1,
@@ -357,10 +403,13 @@ void Kalman_Filter_xhatUpdate(kalman_filter_t *kf)
         return;
     }
 
+    (void)my_matrix_dimensions(&kf->temp_vector, kf->z.numRows, 1);
+    (void)my_matrix_dimensions(&kf->temp_vector1, kf->z.numRows, 1);
     kf->MatStatus = my_matrix_multiply(&kf->H, &kf->xhatminus,
                                     &kf->temp_vector);
     kf->MatStatus = my_matrix_subtract(&kf->z, &kf->temp_vector,
                                     &kf->temp_vector1);
+    (void)my_matrix_dimensions(&kf->temp_vector, kf->xhatSize, 1);
     kf->MatStatus = my_matrix_multiply(&kf->K, &kf->temp_vector1,
                                     &kf->temp_vector);
     kf->MatStatus = my_matrix_add(&kf->xhatminus, &kf->temp_vector,
@@ -374,6 +423,8 @@ void Kalman_Filter_P_Update(kalman_filter_t *kf)
         return;
     }
 
+    (void)my_matrix_dimensions(&kf->temp_matrix, kf->xhatSize, kf->xhatSize);
+    (void)my_matrix_dimensions(&kf->temp_matrix1, kf->xhatSize, kf->xhatSize);
     kf->MatStatus = my_matrix_multiply(&kf->K, &kf->H,
                                     &kf->temp_matrix);
     kf->MatStatus = my_matrix_multiply(&kf->temp_matrix, &kf->Pminus,
@@ -394,28 +445,44 @@ static float *Kalman_Filter_Update(kalman_filter_t *kf)
         kf->User_Callback(kf);
     }
 
-    Kalman_Filter_xhatMinusUpdate(kf);
+    Kalman_Filter_xhat_Predict(kf);
+    if (kf->MatStatus != MY_MATH_OK) {
+        return NULL;
+    }
     if (kf->User_Callback1 != NULL) {
         kf->User_Callback1(kf);
     }
 
-    Kalman_Filter_PminusUpdate(kf);
+    Kalman_Filter_P_Predict(kf);
+    if (kf->MatStatus != MY_MATH_OK) {
+        return NULL;
+    }
     if (kf->User_Callback2 != NULL) {
         kf->User_Callback2(kf);
     }
 
     if (kf->MeasurementValidNum != 0 || kf->UseAutoAdjustment == 0) {
-        Kalman_Filter_SetK(kf);
+        /* The nonlinear callback replaces the linear measurement update. */
         if (kf->User_Callback3 != NULL) {
             kf->User_Callback3(kf);
+        } else {
+            Kalman_Filter_SetK(kf);
+            if (kf->MatStatus != MY_MATH_OK) {
+                return NULL;
+            }
+            Kalman_Filter_xhatUpdate(kf);
         }
-
-        Kalman_Filter_xhatUpdate(kf);
+        if (kf->MatStatus != MY_MATH_OK) {
+            return NULL;
+        }
         if (kf->User_Callback4 != NULL) {
             kf->User_Callback4(kf);
         }
 
         Kalman_Filter_P_Update(kf);
+        if (kf->MatStatus != MY_MATH_OK) {
+            return NULL;
+        }
     } else {
         memcpy(kf->xhat_data, kf->xhatminus_data,
                sizeof(float) * kf->xhatSize);
@@ -463,7 +530,8 @@ bool IMU_QuaternionEKF_InitInstance(QEKF_INS_t *qe,
     if (qe == NULL || process_noise1 <= 0.0f ||
         process_noise2 <= 0.0f || measure_noise <= 0.0f ||
         !isfinite(process_noise1) || !isfinite(process_noise2) ||
-        !isfinite(measure_noise) || !isfinite(lambda) || lpf < 0.0f) 
+        !isfinite(measure_noise) || !isfinite(lambda) ||
+        !isfinite(lpf) || lpf < 0.0f)
     {
         return false;
     }
@@ -474,7 +542,8 @@ bool IMU_QuaternionEKF_InitInstance(QEKF_INS_t *qe,
     qe->Q1 = process_noise1;
     qe->Q2 = process_noise2;
     qe->R = measure_noise;
-    qe->ChiSquareTestThreshold = 1.0e-8f;
+    qe->Scale = 1.0f;
+    qe->ChiSquareThreshold = 1.0e-8f;
     qe->lambda = (lambda > 1.0f) ? 1.0f : lambda;
     if (qe->lambda <= 0.0f) {
         qe->lambda = 1.0f;
@@ -489,21 +558,22 @@ bool IMU_QuaternionEKF_InitInstance(QEKF_INS_t *qe,
     }
 
     qe->IMU_QuaternionEKF.UserData = qe;
-    Matrix_Init(&qe->ChiSquare, 1, 1, qe->ChiSquare_Data);
+    my_matrix_init(&qe->ChiSquare, 1, 1, qe->ChiSquare_Data);
 
     /* 四元数初始化 */
     qe->IMU_QuaternionEKF.xhat_data[0] = 1.0f;
     qe->IMU_QuaternionEKF.xhat_data[1] = 0.0f;
     qe->IMU_QuaternionEKF.xhat_data[2] = 0.0f;
     qe->IMU_QuaternionEKF.xhat_data[3] = 0.0f;
+    qe->q[0] = 1.0f;
 
-    qe->IMU_QuaternionEKF.User_Callback = IMU_QuaternionEKF_Observe;
+    qe->IMU_QuaternionEKF.User_Callback6 = IMU_QuaternionEKF_Observe;
     qe->IMU_QuaternionEKF.User_Callback1 =
         IMU_QuaternionEKF_F_Linearization_P_Fading;
     qe->IMU_QuaternionEKF.User_Callback2 = IMU_QuaternionEKF_SetH;
     qe->IMU_QuaternionEKF.User_Callback3 =
         IMU_QuaternionEKF_xhatUpdate;
-    qe->IMU_QuaternionEKF.User_Callback4 =
+    qe->IMU_QuaternionEKF.User_Callback5 =
         IMU_QuaternionEKF_P_PostProcess;
 
     memcpy(qe->IMU_QuaternionEKF.F_data, IMU_QuaternionEKF_F,
@@ -511,8 +581,7 @@ bool IMU_QuaternionEKF_InitInstance(QEKF_INS_t *qe,
     memcpy(qe->IMU_QuaternionEKF.P_data, IMU_QuaternionEKF_P,
            sizeof(IMU_QuaternionEKF_P));
 
-    qe->Initialized = TRUE;
-    qe->InstanceMagic = QEKF_INSTANCE_MAGIC;
+    qe->Initialized = true;
     return true;
 }
 
@@ -577,7 +646,7 @@ bool IMU_QuaternionEKF_UpdateInstance(QEKF_INS_t *qe,
     }
 
     if (!qe->Initialized) {
-        if (!IMU_QuaternionEKF_InitInstance(qe, qe->InstanceIndex,
+        if (!IMU_QuaternionEKF_InitInstance(qe, qe->Index,
                                             10.0f, 0.001f,
                                             1000000.0f * 10.0f,
                                             1.0f, 0.0f)) {
@@ -697,14 +766,15 @@ bool IMU_QuaternionEKF_UpdateInstance(QEKF_INS_t *qe,
         2.0f * (qe->q[0] * qe->q[0] + qe->q[3] * qe->q[3]) - 1.0f
     ) * RAD_TO_DEG;
 
-    qe->Roll = asinf(
-        -2.0f * (qe->q[1] * qe->q[3] - qe->q[0] * qe->q[2])
-    ) * RAD_TO_DEG;
+    qe->Roll = asinf(constrain_float(
+        -2.0f * (qe->q[1] * qe->q[3] - qe->q[0] * qe->q[2]),
+        -1.0f, 1.0f)) * RAD_TO_DEG;
 
+    ++qe->UpdateCount;
     return qe->IMU_QuaternionEKF.MatStatus == MY_MATH_OK;
 }
 
-static void IMU_QuaternionEKF_F_Linearization_P_Fading(KalmanFilter_t *kf)
+static void IMU_QuaternionEKF_F_Linearization_P_Fading(kalman_filter_t *kf)
 {
     QEKF_INS_t *qe = qe_from_kf(kf);
     if (qe == NULL) {
@@ -722,7 +792,7 @@ static void IMU_QuaternionEKF_F_Linearization_P_Fading(KalmanFilter_t *kf)
         return;
     }
 
-    const float qInvNorm = fast_invSqrt(normSquared);
+    const float qInvNorm = 1.0f / sqrtf(normSquared);
     for (uint8_t i = 0; i < 4; ++i) {
         kf->xhatminus_data[i] *= qInvNorm;
     }
@@ -754,7 +824,7 @@ static void IMU_QuaternionEKF_F_Linearization_P_Fading(KalmanFilter_t *kf)
     }
 }
 
-static void IMU_QuaternionEKF_SetH(KalmanFilter_t *kf)
+static void IMU_QuaternionEKF_SetH(kalman_filter_t *kf)
 {
     if (kf == NULL || !kf->Initialized) {
         return;
@@ -788,8 +858,8 @@ static void IMU_QuaternionEKF_SetH(KalmanFilter_t *kf)
 
 static void IMU_QuaternionEKF_xhatUpdate(kalman_filter_t *kf)
 {
-    QEKF_INS_t *qe = (QEKF_INS_t *)kf->UserData;
-    if (kf == NULL || !kf->Initialized) {
+    QEKF_INS_t *qe = qe_from_kf(kf);
+    if (qe == NULL || !kf->Initialized) {
         return;
     }
 
@@ -834,7 +904,7 @@ static void IMU_QuaternionEKF_xhatUpdate(kalman_filter_t *kf)
 
     for (uint8_t i = 0; i < 3; ++i) {
         qe->OrientationCosine[i] =
-            acosf(fabsf(kf->temp_vector_data[i]));
+            acosf(constrain_float(fabsf(kf->temp_vector_data[i]), 0.0f, 1.0f));
     }
 
 /* ---------------------Chi-square statistic------------------------ */
@@ -854,6 +924,8 @@ static void IMU_QuaternionEKF_xhatUpdate(kalman_filter_t *kf)
                                       1, kf->temp_vector1.numRows);
     kf->MatStatus = my_matrix_transpose(&kf->temp_vector1,
                                      &kf->temp_vector);
+    kf->MatStatus = my_matrix_multiply(&kf->temp_vector, &kf->temp_matrix,
+                                      &qe->ChiSquare);
 
     /* 标记已收敛 */
     if (qe->ChiSquare_Data[0] <
@@ -872,7 +944,11 @@ static void IMU_QuaternionEKF_xhatUpdate(kalman_filter_t *kf)
         /* 本轮相信预测，不信任测量 */
         if (qe->ErrorCount > 50U) {
             qe->ConvergeFlag = 0;
+            qe->Scale = 1.0f;
+            qe->ErrorCount = 0;
         } else {
+            /* Zero gain keeps the covariance update prediction-only too. */
+            memset(kf->K_data, 0, sizeof(float) * kf->xhatSize * kf->zSize);
             memcpy(kf->xhat_data, kf->xhatminus_data,
                    sizeof(float) * kf->xhatSize);
             memcpy(kf->P_data, kf->Pminus_data,
@@ -883,12 +959,12 @@ static void IMU_QuaternionEKF_xhatUpdate(kalman_filter_t *kf)
         if (qe->ChiSquare_Data[0] >
                 0.1f * qe->ChiSquareThreshold &&
             qe->ConvergeFlag) {
-            qe->AdaptiveGainScale =
+            qe->Scale =
                 (qe->ChiSquareThreshold -
                  qe->ChiSquare_Data[0]) /
                 (0.9f * qe->ChiSquareThreshold);
         } else {
-            qe->AdaptiveGainScale = 1.0f;
+            qe->Scale = 1.0f;
         }
         qe->ErrorCount = 0;
     }
@@ -908,7 +984,7 @@ static void IMU_QuaternionEKF_xhatUpdate(kalman_filter_t *kf)
 
     for (uint16_t i = 0;
          i < (uint16_t)(kf->K.numRows * kf->K.numCols); ++i) {
-        kf->K_data[i] *= qe->AdaptiveGainScale;
+        kf->K_data[i] *= qe->Scale;
     }
 
     for (uint8_t i = 4; i < 6; ++i) {
@@ -944,14 +1020,14 @@ static void IMU_QuaternionEKF_xhatUpdate(kalman_filter_t *kf)
         kf->xhat_data[2] * kf->xhat_data[2] +
         kf->xhat_data[3] * kf->xhat_data[3];
     if (qnorm2 > 1.0e-12f) {
-        const float invNorm = fast_invSqrt(qnorm2);
+        const float invNorm = 1.0f / sqrtf(qnorm2);
         for (uint8_t i = 0; i < 4; ++i) {
             kf->xhat_data[i] *= invNorm;
         }
     }
 }
 
-static void IMU_QuaternionEKF_P_PostProcess(KalmanFilter_t *kf)
+static void IMU_QuaternionEKF_P_PostProcess(kalman_filter_t *kf)
 {
     if (kf == NULL || !kf->Initialized) {
         return;
@@ -965,7 +1041,7 @@ static void IMU_QuaternionEKF_P_PostProcess(KalmanFilter_t *kf)
         kf->xhat_data[2] * kf->xhat_data[2] +
         kf->xhat_data[3] * kf->xhat_data[3];
     if (qnorm2 > 1.0e-12f && isfinite(qnorm2)) {
-        const float invNorm = fast_invSqrt(qnorm2);
+        const float invNorm = 1.0f / sqrtf(qnorm2);
         for (uint8_t i = 0; i < 4; ++i) {
             kf->xhat_data[i] *= invNorm;
         }
@@ -979,8 +1055,8 @@ static void IMU_QuaternionEKF_Observe(kalman_filter_t *kf)
         return;
     }
 
-    memcpy(qe->P_snapshot, kf->P_data, sizeof(qe->P_snapshot));
-    memcpy(qe->K_snapshot, kf->K_data, sizeof(qe->K_snapshot));
-    memcpy(qe->H_snapshot, kf->H_data, sizeof(qe->H_snapshot));
+    memcpy(qe->P_snap, kf->P_data, sizeof(qe->P_snap));
+    memcpy(qe->K_snap, kf->K_data, sizeof(qe->K_snap));
+    memcpy(qe->H_snap, kf->H_data, sizeof(qe->H_snap));
 }
 

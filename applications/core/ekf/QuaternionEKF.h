@@ -29,6 +29,9 @@ extern "C" {
 #ifndef user_malloc
 #define user_malloc malloc
 #endif
+#ifndef user_free
+#define user_free free
+#endif
 
 #define RAD_TO_DEG 57.295779513f
 
@@ -169,6 +172,8 @@ typedef struct QEKF_INS_s {
     uint8_t GyroInstance;
     uint8_t AccelInstance;
     void *SensorContext;
+    QEKF_SensorReadFn ReadGyro;
+    QEKF_SensorReadFn ReadAccel;
 } QEKF_INS_t;
 
 /* Multi-instance API. */
@@ -192,7 +197,7 @@ bool IMU_QuaternionEKF_UpdateInstance(QEKF_INS_t *qe,
                                       float az,
                                       float dt);
 
-/* 绑定传感器读取方法 */
+/* Set ReadGyro/ReadAccel on the instance before using SensorsInstance(). */
 bool IMU_QuaternionEKF_SetSensorProvider(QEKF_INS_t *qe,
                                          uint8_t gyro_instance,
                                          uint8_t accel_instance,

@@ -1,10 +1,23 @@
+'''
+Author: Jack Shaw 2870998241@qq.com
+Date: 2026-11-05 23:32:38
+LastEditors: Jack Shaw 2870998241@qq.com
+LastEditTime: 2026-11-18 15:42:59
+FilePath: /FyPilot/applications/SConscript
+Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+'''
 
 import os
 from building import *
 
 cwd = GetCurrentDir()
 # Select native RT-Thread workers explicitly; unfinished BF modules stay inactive.
-src = ['main.c', 'fc/init.c', 'fc/flight_app.c', 'tasks/tasks.c', 'middleware/ipc/mp_ipc.c']
+
+# cmsis-dsp
+cmsis_dsp_inc = os.path.join(cwd, '../../../packages/CMSIS-DSP/Include')
+
+src = ['main.c', 'fc/init.c', 'fc/flight_app.c', 'tasks/tasks.c', 'middleware/ipc/mp_ipc.c', 
+       'core/ekf/QuaternionEKF.c', 'elrs/receiver_crsf.c', 'elrs/crsf_parser.c', 'elrs/crsf.c']
 
 if GetDepend('BSP_USING_CRSF'):
     src += ['elrs/crsf_parser.c', 'elrs/receiver_crsf.c']
@@ -13,17 +26,21 @@ if GetDepend('BSP_USING_BMI270'):
     src += ['sensors/imu_task.c', 'platform/mp_time.c', 'sensors/bmi270/bmi270.c',
         'sensors/bmi270/bmi2.c', 'sensors/attitude_task.c']
 
-if not GetDepend('BSP_USING_HELLO_WORLD'):
+if GetDepend('BSP_USING_BMI270') or not GetDepend('BSP_USING_HELLO_WORLD'):
     src += ['platform/mp_os.c', 'common/math/my_math.c', 'common/buffer/buffer.c']
 
     if not GetDepend('BSP_USING_BMI270'):
         src += ['platform/mp_time.c']
 
 paths = [cwd] + [os.path.join(cwd, name) for name in
-    ('fc', 'elrs', 'sensors', 'sensors/bmi270', 'platform', 'common', 'common/math',
+    ('core/ekf', 'fc', 'elrs', 'sensors', 'sensors/bmi270', 'platform', 'common', 'common/math',
      'common/buffer', 'include', 'tasks', 'middleware/ipc')]
 
-objs = DefineGroup('FyPilot flight modules', src, depend=[''], CPPPATH=paths,
+# Cortex-M7 使用 CMSIS-DSP 必须定义的架构与 FPU 宏
+paths.append(os.path.join(cwd, '../sdk/cmsis-dsp/Include'))
+CPPDEFINES = ['ARM_MATH_CM7', '__FPU_PRESENT=1U']
+
+objs = DefineGroup('FyPilot flight modules', src, depend=[''], CPPPATH=paths, CPPDEFINES=CPPDEFINES,
                    LOCAL_CFLAGS=' -Wextra -Wno-cast-function-type')
 
 Return('objs')

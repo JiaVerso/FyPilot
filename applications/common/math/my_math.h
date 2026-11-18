@@ -19,7 +19,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "dsp/matrix_functions.h"
+#include "arm_math.h"
 
 
 typedef struct{

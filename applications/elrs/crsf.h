@@ -1,4 +1,12 @@
 /*
+ * @Author: Jack Shaw 2870998241@qq.com
+ * @Date: 2026-11-05 23:31:08
+ * @LastEditors: Jack Shaw 2870998241@qq.com
+ * @LastEditTime: 2026-11-18 16:18:22
+ * @FilePath: /FyPilot/applications/elrs/crsf.h
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
+/*
  * This file is part of Cleanflight and Betaflight.
  *
  * Cleanflight and Betaflight are free software. You can redistribute
@@ -20,7 +28,7 @@
 
 #pragma once
 
-#include "rx/crsf_protocol.h"
+#include "crsf_protocol.h"
 
 
 #define CRSF_PORT_OPTIONS       (SERIAL_STOPBITS_1 | SERIAL_PARITY_NO)
@@ -66,26 +74,33 @@ typedef enum {
 } crsfRfMode_e;
 */
 
-typedef struct crsfFrameDef_s {
+typedef struct crsfFrameDef_s 
+{
     uint8_t deviceAddress;
     uint8_t frameLength;
     uint8_t type;
     uint8_t payload[CRSF_PAYLOAD_SIZE_MAX + 1]; // +1 for CRC at end of payload
 } crsfFrameDef_t;
 
-typedef union crsfFrame_u {
+typedef union crsfFrame_u 
+{
     uint8_t bytes[CRSF_FRAME_SIZE_MAX];
     crsfFrameDef_t frame;
 } crsfFrame_t;
 
+/* 遥测回传相关 */
 void crsfRxWriteTelemetryData(const void *data, int len);
 void crsfRxSendTelemetryData(void);
 bool crsfRxIsTelemetryBufEmpty(void); // check this function before using crsfRxWriteTelemetryData()
 
-struct rxConfig_s;
-struct rxRuntimeState_s;
+/* 接收机初始化 */
 bool crsfRxInit(const struct rxConfig_s *initialRxConfig, struct rxRuntimeState_s *rxRuntimeState);
+
+/* 更新波特率 */
 void crsfRxUpdateBaudrate(uint32_t baudrate);
+
+/* 自动协商波特率 */
 bool crsfRxUseNegotiatedBaud(void);
 bool crsfRxIsActive(void);
+/* 进入对频 */
 void crsfRxBind(void);

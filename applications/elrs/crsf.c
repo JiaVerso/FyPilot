@@ -22,8 +22,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "platform.h"
+#include <rtconfig.h>
 
 #ifdef USE_SERIALRX_CRSF
 

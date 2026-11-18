@@ -1,12 +1,21 @@
 # Task scaffold definitions retained for subsequent porting.
 # Not sourced by the active H743 BSP until these tasks and DPS368 are adapted.
 
-menuconfig BSP_USING_FYPILOT
+menu "FyPilot Flight Control Config"
+
+config BSP_USING_FYPILOT
     bool "Enable FyPilot flight-control practice project"
     default y
     help
         Enable the minimal FyPilot scaffold used to port and study
         StarryPilot tasks on RT-Thread v5.x. Hardware integration is required.
+
+config USE_SERIALRX_CRSF
+        bool "Enable CRSF Serial Receiver"
+        select RT_USING_SERIAL
+        default y
+        help
+            Enable CRSF (Crossfire) serial receiver support.
 
 if BSP_USING_FYPILOT
 
@@ -41,3 +50,4 @@ config FYPILOT_DPS368_I2C_ADDRESS
 
 endif
 endif
+endmenu

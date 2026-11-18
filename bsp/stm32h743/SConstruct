@@ -36,7 +36,7 @@ objs += SConscript(os.path.join(BSP_ROOT, '../../drivers/SConscript'), variant_d
 objs += SConscript(os.path.join(SDK_ROOT, 'stm32/SConscript'), variant_dir='build/sdk/stm32', duplicate=0)
 objs += SConscript(os.path.join(BSP_ROOT, '../../tools/SConscript'),variant_dir='build/tools',duplicate=0,)
 
-if not GetDepend('BSP_USING_HELLO_WORLD'):
+if GetDepend('BSP_USING_BMI270') or not GetDepend('BSP_USING_HELLO_WORLD'):
     objs += SConscript(os.path.join(SDK_ROOT, 'cmsis-dsp/SConscript'), variant_dir='build/sdk/cmsis-dsp', duplicate=0)
 
 DoBuilding('build/fypilot.elf', objs)

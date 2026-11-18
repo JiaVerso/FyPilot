@@ -15,3 +15,6 @@ config SOC_STM32H743VI
     select RT_USING_USER_MAIN
 source "$(RTT_DIR)/Kconfig"
 rsource "board/Kconfig"
+
+source "../../applications/Kconfig"
+rsource "board/Kconfig"
