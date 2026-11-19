@@ -10,13 +10,6 @@ config BSP_USING_FYPILOT
         Enable the minimal FyPilot scaffold used to port and study
         StarryPilot tasks on RT-Thread v5.x. Hardware integration is required.
 
-config USE_SERIALRX_CRSF
-        bool "Enable CRSF Serial Receiver"
-        select RT_USING_SERIAL
-        default y
-        help
-            Enable CRSF (Crossfire) serial receiver support.
-
 if BSP_USING_FYPILOT
 
 config FYPILOT_LOOP_HZ

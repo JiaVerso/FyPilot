@@ -17,4 +17,3 @@ source "$(RTT_DIR)/Kconfig"
 rsource "board/Kconfig"
 
 source "../../applications/Kconfig"
-rsource "board/Kconfig"

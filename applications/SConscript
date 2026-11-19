@@ -16,8 +16,8 @@ cwd = GetCurrentDir()
 # cmsis-dsp
 cmsis_dsp_inc = os.path.join(cwd, '../../../packages/CMSIS-DSP/Include')
 
-src = ['main.c', 'fc/init.c', 'fc/flight_app.c', 'tasks/tasks.c', 'middleware/ipc/mp_ipc.c', 
-       'core/ekf/QuaternionEKF.c', 'elrs/receiver_crsf.c', 'elrs/crsf_parser.c', 'elrs/crsf.c']
+src = ['main.c', 'fc/init.c', 'fc/flight_app.c', 'tasks/tasks.c', 'middleware/ipc/mp_ipc.c',
+       'core/ekf/QuaternionEKF.c']
 
 if GetDepend('BSP_USING_CRSF'):
     src += ['elrs/crsf_parser.c', 'elrs/receiver_crsf.c']

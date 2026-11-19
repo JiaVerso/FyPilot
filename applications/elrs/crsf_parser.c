@@ -2,7 +2,8 @@
  * Adapted from HPMicro Betaflight crsfDataReceive/crsfFrameStatus/crsfReadRawRC.
  * Keeps the upstream 0x16 packing, CRC-8/DVB-S2 and channel scaling.
  * Uses explicit bit extraction instead of compiler-dependent C bit-fields.
- * Full upstream notices and sources: app/rx/crsf.c, crsf.h, crsf_protocol.h and ORIGIN.txt.
+ * Derived from Cleanflight/Betaflight under GPL-3.0-or-later.
+ * See COPYING.GPL-3.0 at the repository root for the license text.
  */
 #include "crsf_parser.h"
 #include <string.h>
@@ -25,33 +26,37 @@ uint16_t crsf_channel_to_us(uint16_t raw)
     return (uint16_t)(0.62477120195241f * (float)raw + 881.0f);
 }
 
+/* 初始化 */
 void crsf_parser_init(crsf_parser_t *parser)
 {
     if (parser != NULL)
         memset(parser, 0, sizeof(*parser));
 }
 
+/* 数据移位 */
 static void consume(crsf_parser_t *parser, size_t count)
 {
     parser->buffered -= count;
     memmove(parser->frame, parser->frame + count, parser->buffered);
 }
 
+/* 解码帧 */
 static void decode_frame(crsf_parser_t *parser, size_t total, uint32_t now_ms)
 {
     crsf_state_t *state = &parser->state;
     const uint8_t *payload = &parser->frame[3];
     if (parser->frame[2] == CRSF_FRAMETYPE_RC_CHANNELS_PACKED)
     {
-        if (total != 26u) /* address + length + type + 22 payload + CRC */
+        /* 判断帧长度 */
+        if (total != CRSF_FRAME_RC_CHANNELS_PAYLOAD_SIZE + CRSF_FRAME_LENGTH_NON_PAYLOAD)
         {
             ++state->length_errors;
             return;
         }
         uint32_t bits = 0;
-        unsigned available = 0;
-        size_t pos = 0;
-        for (unsigned channel = 0; channel < CRSF_CHANNEL_COUNT; ++channel)
+        uint8_t available = 0;
+        uint8_t pos = 0;
+        for (uint8_t channel = 0; channel < CRSF_CHANNEL_COUNT; ++channel)
         {
             while (available < 11u)
             {
@@ -69,7 +74,7 @@ static void decode_frame(crsf_parser_t *parser, size_t total, uint32_t now_ms)
     }
     else if (parser->frame[2] == CRSF_FRAMETYPE_LINK_STATISTICS)
     {
-        if (total != 14u)
+        if (total != CRSF_FRAME_LINK_STATISTICS_PAYLOAD_SIZE + CRSF_FRAME_LENGTH_NON_PAYLOAD)
         {
             ++state->length_errors;
             return;
@@ -85,7 +90,15 @@ static void decode_frame(crsf_parser_t *parser, size_t total, uint32_t now_ms)
         ++state->ignored_frames;
 }
 
-void crsf_parser_feed(crsf_parser_t *parser, const uint8_t *bytes,
+/* 
+ * 解析器数据喂入
+ * @parser:	 解析器实例，保存上一次剩余的字节和解析结果
+ * @bytes:	 本次收到的字节数组
+ * @length:	 本次收到的字节数量
+ * @now_ms:	 本次喂入数据时的毫秒时间戳
+ *
+*/
+void crsf_parser_parser(crsf_parser_t *parser, const uint8_t *bytes,
                       size_t length, uint32_t now_ms)
 {
     if (parser == NULL || (bytes == NULL && length != 0u))
@@ -93,18 +106,25 @@ void crsf_parser_feed(crsf_parser_t *parser, const uint8_t *bytes,
     if (parser->buffered != 0u &&
         (uint32_t)(now_ms - parser->last_byte_ms) >= CRSF_PARTIAL_TIMEOUT_MS)
     {
+        /* 超时帧丢弃 */
         parser->state.discarded_bytes += (uint32_t)parser->buffered;
         parser->buffered = 0;
         ++parser->state.partial_timeouts;
     }
+
+    /*  */
     for (size_t i = 0; i < length; ++i)
     {
         parser->last_byte_ms = now_ms;
+
+        /* 残缺帧丢弃 */
         if (parser->buffered == 0u && bytes[i] != CRSF_ADDRESS_FLIGHT_CONTROLLER)
         {
             ++parser->state.discarded_bytes;
             continue;
         }
+
+        /* 串口字节填入frame */
         parser->frame[parser->buffered++] = bytes[i];
         while (parser->buffered != 0u)
         {
@@ -116,6 +136,7 @@ void crsf_parser_feed(crsf_parser_t *parser, const uint8_t *bytes,
             }
             if (parser->buffered < 2u)
                 break;
+
             size_t frame_length = parser->frame[1];
             if (frame_length < 2u || frame_length > CRSF_FRAME_SIZE_MAX - 2u)
             {
@@ -124,6 +145,7 @@ void crsf_parser_feed(crsf_parser_t *parser, const uint8_t *bytes,
                 consume(parser, 1);
                 continue;
             }
+
             size_t total = frame_length + 2u;
             if (parser->buffered < total)
                 break;
