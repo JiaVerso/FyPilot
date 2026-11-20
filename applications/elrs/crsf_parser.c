@@ -20,10 +20,23 @@ static uint8_t crsf_crc(const uint8_t *bytes, size_t length)
     return crc;
 }
 
-uint16_t crsf_channel_to_us(uint16_t raw)
+float crsf_to_normal(uint16_t raw)
 {
-    /* Same legacy scale and offset as HPM BF; truncate the result to whole us. */
-    return (uint16_t)(0.62477120195241f * (float)raw + 881.0f);
+
+    // raw_min < raw_mid < raw_max，均使用实际校准值
+    float value = (float)raw - (float)CRSF_RC_MIDD_VALUE;
+
+    if (value >= 0.0f)
+        value /= (float)(CRSF_RC_MAX_VALUE - CRSF_RC_MIDD_VALUE);
+    else {
+        value /= (float)(CRSF_RC_MIDD_VALUE - CRSF_RC_MIN_VALUE);
+    }
+
+    // 限制到 [-1, 1]
+    if (value >  1.0f) value =  1.0f;
+    if (value < -1.0f) value = -1.0f;
+    /*  */
+    return value;
 }
 
 /* 初始化 */
@@ -64,7 +77,7 @@ static void decode_frame(crsf_parser_t *parser, size_t total, uint32_t now_ms)
                 available += 8u;
             }
             state->raw[channel] = (uint16_t)(bits & 0x7ffu);
-            state->channel_us[channel] = crsf_channel_to_us(state->raw[channel]);
+            state->channel_normal[channel] = crsf_to_normal(state->raw[channel]);
             bits >>= 11;
             available -= 11u;
         }

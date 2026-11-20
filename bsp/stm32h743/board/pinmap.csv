@@ -5,8 +5,8 @@ receiver TX,PC6,USART6,pin configured; CRSF TX unused,CRSF telemetry not impleme
 receiver RX,PC7,USART6,enabled,CRSF receiver TX -> PC7; 420000 8N1; no inversion
 TX,PA9,USART1,recorded only,
 RX,PA10,USART1,recorded only,
-TX,PD5,USART2,recorded only,
-RX,PD6,USART2,recorded only,
+TX,PD5,USART2,enabled; not hardware tested,uart2 TX; AF7; default 115200 8N1
+RX,PD6,USART2,enabled; not hardware tested,uart2 RX; AF7; default 115200 8N1
 TX,PB9,UART4,recorded only,
 RX,PB8,UART4,recorded only,
 TX,PE8,UART7,recorded only,

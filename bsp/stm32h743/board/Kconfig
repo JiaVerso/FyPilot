@@ -1,4 +1,4 @@
-menu "AOPAH743 hardware"
+menu "H743 hardware"
 config BSP_USING_HELLO_WORLD
     bool "Power-on Hello World demo (USART3, 115200 8N1)"
     default y
@@ -10,18 +10,33 @@ config BSP_USING_UART
     bool
     default y
     select RT_USING_SERIAL
+
+#----------------------------------------------#
 config BSP_USING_UART3
     bool
+    default y
+config BSP_USING_UART2
+    bool "Register USART2 PD5/PD6 as uart2"
+    depends on BSP_USING_UART
     default y
 config BSP_USING_UART6
     bool "Register USART6 PC6/PC7 for receiver"
     default y if !BSP_USING_HELLO_WORLD
+config BSP_UART6_RX_USING_DMA
+    bool "Enable USART6 RX DMA (DMA1 Stream6)"
+    depends on BSP_USING_UART6 && RT_USING_SERIAL_V1
+    depends on !BSP_SCB_ENABLE_D_CACHE
+    select RT_SERIAL_USING_DMA
+    default y if BSP_USING_CRSF
+    help
+        Use circular DMA reception with the RT-Thread serial RX buffer.
+        This driver currently requires D-Cache to remain disabled.
 config BSP_USING_CRSF
     bool "CRSF receiver on USART6 PC7, 420000 baud"
     default y
     select BSP_USING_UART6
 config BSP_CRSF_RX_BUFFER_SIZE
-    int "CRSF interrupt receive FIFO bytes"
+    int "CRSF receive buffer bytes"
     depends on BSP_USING_CRSF
     range 256 4096
     default 1024
@@ -30,6 +45,8 @@ config BSP_CRSF_SIGNAL_TIMEOUT_MS
     depends on BSP_USING_CRSF
     range 20 1000
     default 100
+#----------------------------------------------#
+
 config BSP_STM32_UART_V1_TX_TIMEOUT
     int
     default 20
@@ -53,7 +70,7 @@ config BSP_SCB_ENABLE_I_CACHE
     bool "Enable instruction cache"
     default y
 config BSP_SCB_ENABLE_D_CACHE
-    bool "Enable data cache (DMA is disabled in this target)"
+    bool "Enable data cache (USART6 RX DMA requires this disabled)"
     default n
 config BSP_USING_BMI270
     bool "BMI270 on SPI4, CS PE11, INT1 PE15"

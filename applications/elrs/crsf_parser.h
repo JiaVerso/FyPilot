@@ -2,7 +2,7 @@
  * @Author: Jack Shaw 2870998241@qq.com
  * @Date: 2026-11-05 23:32:38
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-19 19:21:41
+ * @LastEditTime: 2026-11-20 15:37:39
  * @FilePath: /FyPilot/applications/elrs/crsf_parser.h
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -23,7 +23,7 @@
 typedef struct crsf_state_s
 {
     uint16_t raw[CRSF_CHANNEL_COUNT];
-    uint16_t channel_us[CRSF_CHANNEL_COUNT];
+    uint16_t channel_normal[CRSF_CHANNEL_COUNT];
     uint32_t last_rc_ms;                            /* 解码通道帧的时间戳，单位: ms */
     uint32_t rc_frames;                             /* 解码通道帧数量 */
     uint32_t crc_errors;                            /* CRC 校验错误次数 */
@@ -56,6 +56,6 @@ void crsf_parser_parser(crsf_parser_t *parser, const uint8_t *bytes,
                       size_t length, uint32_t now_ms);
 void crsf_parser_snapshot(const crsf_parser_t *parser, uint32_t now_ms,
                           uint32_t signal_timeout_ms, crsf_state_t *state);
-uint16_t crsf_channel_to_us(uint16_t raw);
+float crsf_to_normal(uint16_t raw);
 
 #endif

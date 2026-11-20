@@ -1,19 +1,41 @@
-/* SPDX-License-Identifier: GPL-3.0-or-later
- * RT-Thread UART transport for the HPM Betaflight-derived CRSF receiver.
- * The official serial ISR fills its FIFO. All parsing happens in this worker.
+/*
+ * @Author: Jack Shaw 2870998241@qq.com
+ * @Date: 2026-11-05 23:32:38
+ * @LastEditors: Jack Shaw 2870998241@qq.com
+ * @LastEditTime: 2026-11-20 17:37:10
+ * @FilePath: /FyPilot/applications/elrs/receiver_crsf.h
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
+
 #include "receiver_crsf.h"
 #include "target_config.h"
+#include "SEGGER_RTT.h"
 #include <rtdevice.h>
 #include <rthw.h>
 #include <finsh.h>
 
-static rt_device_t serial;
-static struct rt_thread receiver_thread;
-rt_align(RT_ALIGN_SIZE) static rt_uint8_t receiver_stack[2048];
+
+static rt_device_t serial;                      /* 串口设备句柄 */      
+static struct rt_semaphore crsf_sem;
+struct serial_configure config = RT_SERIAL_CONFIG_DEFAULT;
+
+static struct rt_thread receiver_thread;        /* 线程句柄 */
+
+static rt_uint8_t receiver_stack[2048];
 static crsf_parser_t parser;
-static crsf_state_t latest;
+
+
+static crsf_state_t latest;                     /* 数据副本 */
 static bool started;
+
+ /* 接收数据回调函数 */
+static rt_err_t uart_rx_ind(rt_device_t dev, rt_size_t size)
+{
+    (void)dev;
+    if (size > 0u)
+        rt_sem_release(&crsf_sem);
+    return RT_EOK;
+}
 
 static uint32_t now_ms(void)
 {
@@ -24,23 +46,50 @@ static uint32_t now_ms(void)
 static void crsf_receiver_entry(void *parameter)
 {
     uint8_t bytes[64];
+    uint32_t last_log_ms = 0;
+    uint32_t last_log_frames = 0;
     (void)parameter;
+    
     while (1)
     {
+        rt_sem_take(&crsf_sem, RT_WAITING_FOREVER);
+        
         /* Bound each pass so continuous noise cannot monopolize the CPU. */
-        for (unsigned batch = 0; batch < 16; ++batch)
+        for (uint16_t batch = 0; batch < CRSF_DRAIN_MAX; ++batch)
         {
-            rt_ssize_t count = rt_device_read(serial, 0, bytes, sizeof(bytes));
+            rt_ssize_t count = rt_device_read(serial, -1, bytes, sizeof(bytes));
             if (count <= 0)
                 break;
-            crsf_parser_feed(&parser, bytes, (size_t)count, now_ms());
+            crsf_parser_parser(&parser, bytes, (size_t)count, now_ms());
         }
         crsf_state_t copy;
-        crsf_parser_snapshot(&parser, now_ms(), BSP_CRSF_SIGNAL_TIMEOUT_MS, &copy);
+        uint32_t time_ms = now_ms();
+        crsf_parser_snapshot(&parser, time_ms, BSP_CRSF_SIGNAL_TIMEOUT_MS, &copy);
         rt_base_t level = rt_hw_interrupt_disable();
         latest = copy;
         rt_hw_interrupt_enable(level);
-        rt_thread_mdelay(1);
+
+        /* Keep RTT output outside the ISR and critical section; limit to 10 Hz. */
+        if (copy.signal_valid && copy.rc_frames != last_log_frames &&
+            (uint32_t)(time_ms - last_log_ms) >= 100u)
+        {
+            last_log_ms = time_ms;
+            last_log_frames = copy.rc_frames;
+            SEGGER_RTT_printf(0,
+                "CRSF[raw]: CH01=%u CH02=%u CH03=%u CH04=%u "
+                "CH05=%u CH06=%u CH07=%u CH08=%u "
+                "CH09=%u CH10=%u CH11=%u CH12=%u "
+                "CH13=%u CH14=%u CH15=%u CH16=%u\n",
+                (unsigned)copy.raw[0], (unsigned)copy.raw[1],
+                (unsigned)copy.raw[2], (unsigned)copy.raw[3],
+                (unsigned)copy.raw[4], (unsigned)copy.raw[5],
+                (unsigned)copy.raw[6], (unsigned)copy.raw[7],
+                (unsigned)copy.raw[8], (unsigned)copy.raw[9],
+                (unsigned)copy.raw[10], (unsigned)copy.raw[11],
+                (unsigned)copy.raw[12], (unsigned)copy.raw[13],
+                (unsigned)copy.raw[14], (unsigned)copy.raw[15]);
+        }
+
     }
 }
 
@@ -48,29 +97,47 @@ rt_err_t crsf_receiver_start(void)
 {
     if (started)
         return -RT_EBUSY;
+
+    /* step1：查找串口设备 */
     serial = rt_device_find(MP_CRSF_DEVICE);
     if (serial == RT_NULL)
         return -RT_ENOSYS;
     if (serial->ref_count != 0u)
         return -RT_EBUSY;
-    struct serial_configure config = RT_SERIAL_CONFIG_DEFAULT;
+
+    /* step2：修改串口配置参数 */
     config.baud_rate = CRSF_BAUDRATE;
     config.data_bits = DATA_BITS_8;
     config.stop_bits = STOP_BITS_1;
     config.parity = PARITY_NONE;
     config.bufsz = BSP_CRSF_RX_BUFFER_SIZE;
+
+    /* step3：控制串口设备。通过控制接口传入命令控制字，与控制参数 */
     rt_err_t err = rt_device_control(serial, RT_DEVICE_CTRL_CONFIG, &config);
     if (err != RT_EOK)
         return err;
-    err = rt_device_open(serial, RT_DEVICE_OFLAG_RDONLY | RT_DEVICE_FLAG_INT_RX);
+
+    /* Initialize the notification object before DMA can invoke its callback. */
+    err = rt_sem_init(&crsf_sem, "crsf_rx", 0, RT_IPC_FLAG_FIFO);
     if (err != RT_EOK)
         return err;
+    err = rt_device_set_rx_indicate(serial, uart_rx_ind);
+    if (err != RT_EOK)
+        goto detach_sem;
+
+    /* CRSF currently only receives; choose the enabled BSP receive mode. */
+
+    err = rt_device_open(serial, RT_DEVICE_OFLAG_RDONLY | RT_DEVICE_FLAG_DMA_RX);
+    if (err != RT_EOK)
+        goto clear_rx_indicate;
+        
     crsf_parser_init(&parser);
     rt_memset(&latest, 0, sizeof(latest));
     err = rt_thread_init(&receiver_thread, "crsf", crsf_receiver_entry, RT_NULL,
                          receiver_stack, sizeof(receiver_stack), 6, 1);
     if (err != RT_EOK)
         goto close_serial;
+
     err = rt_thread_startup(&receiver_thread);
     if (err != RT_EOK)
     {
@@ -79,8 +146,15 @@ rt_err_t crsf_receiver_start(void)
     }
     started = true;
     return RT_EOK;
+    
 close_serial:
+    rt_device_set_rx_indicate(serial, RT_NULL);
     rt_device_close(serial);
+    goto detach_sem;
+clear_rx_indicate:
+    rt_device_set_rx_indicate(serial, RT_NULL);
+detach_sem:
+    rt_sem_detach(&crsf_sem);
     return err;
 }
 
@@ -93,34 +167,8 @@ bool crsf_receiver_get(crsf_state_t *state)
     rt_hw_interrupt_enable(level);
     uint32_t time = now_ms();
     state->signal_valid = started && state->has_channels &&
-        (uint32_t)(time - state->last_rc_ms) < BSP_CRSF_SIGNAL_TIMEOUT_MS;
+                          (uint32_t)(time - state->last_rc_ms) < BSP_CRSF_SIGNAL_TIMEOUT_MS;
     state->link_statistics_valid = state->link_frames != 0u &&
-        (uint32_t)(time - state->last_link_ms) < 250u;
+                                   (uint32_t)(time - state->last_link_ms) < 250u;
     return state->signal_valid;
 }
-
-static void crsf(void)
-{
-    crsf_state_t state;
-    crsf_receiver_get(&state);
-    rt_kprintf("CRSF uart6 PC7(RX) 420000 8N1 started=%u valid=%u frames=%u\n",
-               (unsigned)started, (unsigned)state.signal_valid, state.rc_frames);
-    rt_kprintf("crc_errors=%u length_errors=%u partial_timeouts=%u discarded=%u ignored=%u\n",
-               state.crc_errors, state.length_errors, state.partial_timeouts,
-               state.discarded_bytes, state.ignored_frames);
-    if (!state.has_channels)
-    {
-        rt_kprintf("No valid RC frame received; channel values are not available.\n");
-        return;
-    }
-    rt_kprintf("RC age=%u ms; retained values are stale when valid=0\n",
-               (uint32_t)(now_ms() - state.last_rc_ms));
-    for (unsigned i = 0; i < CRSF_CHANNEL_COUNT; ++i)
-        rt_kprintf("CH%02u raw=%4u us=%4u\n", i + 1u,
-                   (unsigned)state.raw[i], (unsigned)state.channel_us[i]);
-    if (state.link_frames != 0u)
-        rt_kprintf("link_valid=%u LQ=%u RSSI=%d dBm SNR=%d dB RF=%u\n",
-                   (unsigned)state.link_statistics_valid, (unsigned)state.link_quality,
-                   (int)state.rssi_dbm, (int)state.snr_db, (unsigned)state.rf_mode);
-}
-MSH_CMD_EXPORT(crsf, Show all 16 CRSF channels and receive validity);
