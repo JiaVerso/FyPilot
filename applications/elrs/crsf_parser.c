@@ -175,14 +175,7 @@ void crsf_parser_parser(crsf_parser_t *parser, const uint8_t *bytes,
     }
 }
 
-void crsf_parser_snapshot(const crsf_parser_t *parser, uint32_t now_ms,
-                          uint32_t signal_timeout_ms, crsf_state_t *state)
+void crsf_parser_snapshot(const crsf_parser_t *parser, crsf_state_t *state)
 {
-    if (parser == NULL || state == NULL)
-        return;
     *state = parser->state;
-    state->signal_valid = state->has_channels &&
-        (uint32_t)(now_ms - state->last_rc_ms) < signal_timeout_ms;
-    state->link_statistics_valid = state->link_frames != 0u &&
-        (uint32_t)(now_ms - state->last_link_ms) < 250u;
 }

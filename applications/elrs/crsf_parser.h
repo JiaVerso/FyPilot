@@ -54,8 +54,7 @@ typedef struct crsf_parser_s
 void crsf_parser_init(crsf_parser_t *parser);
 void crsf_parser_parser(crsf_parser_t *parser, const uint8_t *bytes,
                       size_t length, uint32_t now_ms);
-void crsf_parser_snapshot(const crsf_parser_t *parser, uint32_t now_ms,
-                          uint32_t signal_timeout_ms, crsf_state_t *state);
+void crsf_parser_snapshot(const crsf_parser_t *parser, crsf_state_t *state);
 float crsf_to_normal(uint16_t raw);
 
 #endif

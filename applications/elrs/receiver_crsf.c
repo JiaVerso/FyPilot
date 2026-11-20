@@ -2,7 +2,7 @@
  * @Author: Jack Shaw 2870998241@qq.com
  * @Date: 2026-11-05 23:32:38
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-20 17:37:10
+ * @LastEditTime: 2026-11-20 18:02:03
  * @FilePath: /FyPilot/applications/elrs/receiver_crsf.h
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -64,14 +64,14 @@ static void crsf_receiver_entry(void *parameter)
         }
         crsf_state_t copy;
         uint32_t time_ms = now_ms();
-        crsf_parser_snapshot(&parser, time_ms, BSP_CRSF_SIGNAL_TIMEOUT_MS, &copy);
+        crsf_parser_snapshot(&parser, &copy);
+
         rt_base_t level = rt_hw_interrupt_disable();
         latest = copy;
         rt_hw_interrupt_enable(level);
 
         /* Keep RTT output outside the ISR and critical section; limit to 10 Hz. */
-        if (copy.signal_valid && copy.rc_frames != last_log_frames &&
-            (uint32_t)(time_ms - last_log_ms) >= 100u)
+        if ((uint32_t)(time_ms - last_log_ms) >= 100u)
         {
             last_log_ms = time_ms;
             last_log_frames = copy.rc_frames;
@@ -156,19 +156,4 @@ clear_rx_indicate:
 detach_sem:
     rt_sem_detach(&crsf_sem);
     return err;
-}
-
-bool crsf_receiver_get(crsf_state_t *state)
-{
-    if (state == RT_NULL)
-        return false;
-    rt_base_t level = rt_hw_interrupt_disable();
-    *state = latest;
-    rt_hw_interrupt_enable(level);
-    uint32_t time = now_ms();
-    state->signal_valid = started && state->has_channels &&
-                          (uint32_t)(time - state->last_rc_ms) < BSP_CRSF_SIGNAL_TIMEOUT_MS;
-    state->link_statistics_valid = state->link_frames != 0u &&
-                                   (uint32_t)(time - state->last_link_ms) < 250u;
-    return state->signal_valid;
 }
