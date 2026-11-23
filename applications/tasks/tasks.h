@@ -20,8 +20,8 @@ typedef enum
 {
     TASK_RX = 0,
     TASK_IMU,
-    TASK_FLIGHT,
     TASK_ATTITUDE,
+    TASK_CONTROL,
     TASK_COUNT
 } taskid_e;
 

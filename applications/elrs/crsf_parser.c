@@ -71,6 +71,7 @@ static void decode_frame(crsf_parser_t *parser, size_t total, uint32_t now_ms)
         uint8_t pos = 0;
         for (uint8_t channel = 0; channel < CRSF_CHANNEL_COUNT; ++channel)
         {
+            /* 取出 16 通道 11-bits 数据 */
             while (available < 11u)
             {
                 bits |= (uint32_t)payload[pos++] << available;

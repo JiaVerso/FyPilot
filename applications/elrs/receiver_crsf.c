@@ -2,7 +2,7 @@
  * @Author: Jack Shaw 2870998241@qq.com
  * @Date: 2026-11-05 23:32:38
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-20 18:02:03
+ * @LastEditTime: 2026-11-23 11:16:29
  * @FilePath: /FyPilot/applications/elrs/receiver_crsf.h
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -47,7 +47,6 @@ static void crsf_receiver_entry(void *parameter)
 {
     uint8_t bytes[64];
     uint32_t last_log_ms = 0;
-    uint32_t last_log_frames = 0;
     (void)parameter;
     
     while (1)
@@ -74,24 +73,23 @@ static void crsf_receiver_entry(void *parameter)
         if ((uint32_t)(time_ms - last_log_ms) >= 100u)
         {
             last_log_ms = time_ms;
-            last_log_frames = copy.rc_frames;
             SEGGER_RTT_printf(0,
                 "CRSF[raw]: CH01=%u CH02=%u CH03=%u CH04=%u "
                 "CH05=%u CH06=%u CH07=%u CH08=%u "
                 "CH09=%u CH10=%u CH11=%u CH12=%u "
                 "CH13=%u CH14=%u CH15=%u CH16=%u\n",
-                (unsigned)copy.raw[0], (unsigned)copy.raw[1],
-                (unsigned)copy.raw[2], (unsigned)copy.raw[3],
-                (unsigned)copy.raw[4], (unsigned)copy.raw[5],
-                (unsigned)copy.raw[6], (unsigned)copy.raw[7],
-                (unsigned)copy.raw[8], (unsigned)copy.raw[9],
-                (unsigned)copy.raw[10], (unsigned)copy.raw[11],
-                (unsigned)copy.raw[12], (unsigned)copy.raw[13],
-                (unsigned)copy.raw[14], (unsigned)copy.raw[15]);
+                (uint16_t)latest.raw[0], (uint16_t)latest.raw[1],
+                (uint16_t)latest.raw[2], (uint16_t)latest.raw[3],
+                (uint16_t)latest.raw[4], (uint16_t)latest.raw[5],
+                (uint16_t)latest.raw[6], (uint16_t)latest.raw[7],
+                (uint16_t)latest.raw[8], (uint16_t)latest.raw[9],
+                (uint16_t)latest.raw[10], (uint16_t)latest.raw[11],
+                (uint16_t)latest.raw[12], (uint16_t)latest.raw[13],
+                (uint16_t)latest.raw[14], (uint16_t)latest.raw[15]);
         }
 
     }
-}
+} 
 
 rt_err_t crsf_receiver_start(void)
 {
@@ -102,9 +100,7 @@ rt_err_t crsf_receiver_start(void)
     serial = rt_device_find(MP_CRSF_DEVICE);
     if (serial == RT_NULL)
         return -RT_ENOSYS;
-    if (serial->ref_count != 0u)
-        return -RT_EBUSY;
-
+        
     /* step2：修改串口配置参数 */
     config.baud_rate = CRSF_BAUDRATE;
     config.data_bits = DATA_BITS_8;

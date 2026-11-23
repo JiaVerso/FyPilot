@@ -2,7 +2,7 @@
  * @Author: Jack Shaw 2870998241@qq.com
  * @Date: 2026-11-05 20:45:56
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-17 18:26:36
+ * @LastEditTime: 2026-11-23 15:38:11
  * @FilePath: /FyPilot/applications/tasks/tasks.c
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -11,6 +11,7 @@
 #include "status.h"
 #include "config.h"
 #include "attitude_task.h"
+#include "control_task.h"
 
 #include <finsh.h>
 #include <rthw.h>
@@ -23,7 +24,7 @@
 
 /* Reuse each module's worker; do not create a second UART or SPI reader. */
 static const task_definition_t taskDefinitions[TASK_COUNT] =
-    {
+{
         [TASK_RX] = {"crsf", "UART6 RX / 1 ms poll",
 #ifdef BSP_USING_CRSF
                      crsf_receiver_start
@@ -44,8 +45,15 @@ static const task_definition_t taskDefinitions[TASK_COUNT] =
 #else
                     RT_NULL
 #endif
-}
-    };
+    },
+        [TASK_CONTROL] = {"control", "Attitude and Angular Velocity",
+#ifdef BSP_USING_BMI270
+                      mp_control_start
+#else
+                    RT_NULL
+#endif
+    }
+};
 
 static task_status_t taskStatus[TASK_COUNT];
 static rt_bool_t dataInitialized;

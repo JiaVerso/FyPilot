@@ -2,7 +2,7 @@
  * @Author: Jack Shaw 2870998241@qq.com
  * @Date: 2026-11-16 15:23:48
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-18 11:51:31
+ * @LastEditTime: 2026-11-23 16:43:43
  * @FilePath: /FyPilot/applications/sensors/ekf_task.c
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -14,7 +14,7 @@
 
 static QEKF_INS_t qe;
 static struct rt_thread att_thread;
-rt_align(RT_ALIGN_SIZE) static uint8_t attitude_stack[2048];
+static uint8_t attitude_stack[2048];
 static bool started;
 
 static void mp_attitude_entry(void *parameter)
@@ -81,14 +81,14 @@ static void mp_attitude_entry(void *parameter)
             if ((uint32_t)(now_ms - last_log_ms) >= 100U)
             {
                 last_log_ms = now_ms;
-                SEGGER_RTT_printf(
-                    0,
-                    /* SEGGER's compact formatter does not support %f. */
-                    "attitude[mdeg]: roll=%d pitch=%d yaw=%d\n",
-                    (int)(qe->Roll * 1000.0f),
-                    (int)(qe->Pitch * 1000.0f),
-                    (int)(qe->Yaw * 1000.0f)
-                );
+                // SEGGER_RTT_printf(
+                //     0,
+                //     /* SEGGER's compact formatter does not support %f. */
+                //     "attitude[mdeg]: roll=%d pitch=%d yaw=%d\n",
+                //     (int)(qe->Roll * 1000.0f),
+                //     (int)(qe->Pitch * 1000.0f),
+                //     (int)(qe->Yaw * 1000.0f)
+                // );
             }
         }
     }
