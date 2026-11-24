@@ -10,6 +10,7 @@
 #define CONTROL_TASK_H
 
 #include <rtthread.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {

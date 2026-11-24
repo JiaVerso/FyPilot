@@ -20,8 +20,19 @@
 
 #pragma once
 
-void pidInit(const pidProfile_t *pidProfile);
+#include "pid.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* looptime_us 为实际固定控制周期；失败时禁用实例并清零输出。 */
+bool pidInit(const pidProfile_t *pidProfile, uint32_t looptime_us);
 void pidInitFilters(const pidProfile_t *pidProfile);
 void pidInitConfig(const pidProfile_t *pidProfile);
 void pidSetItermAccelerator(float newItermAccelerator);
 void pidCopyProfile(uint8_t dstPidProfileIndex, uint8_t srcPidProfileIndex);
+
+#ifdef __cplusplus
+}
+#endif

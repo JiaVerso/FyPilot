@@ -2,27 +2,42 @@
 #include <stdint.h>
 
 #include "control_task.h"
+#include "uMcn.h"
 #include "config.h"
 #include "mp_time.h"
+#include "receiver_crsf.h"
+#include "attitude_task.h"
+#include "uMcn_topic.h"
+#include "SEGGER_RTT.h"
 
 static struct rt_thread control_thread;
 static uint8_t control_stack[CONTROL_THREAD_STACK_SIZE];
 static bool started;
 
-/* TODO:
-     * 1. 非阻塞读取最新遥控器、姿态和陀螺仪快照。
-     * 2. 检查各数据时间戳和有效性，完成通道映射、单位转换。
-     *    超时/数据未就绪时返回 false，不能无限期沿用旧数据。
-     * 3. 填写 armed；不能仅因遥控数据有效就自动解锁。
-     */
+extern mcn_sub_t control_rc_sub;
+extern mcn_sub_t control_attitude_sub;
+
+/*  */
+rc_channels_msg_t rc;
+attitude_msg_t attitude;
+
+/* 非阻塞读取最新遥控器、姿态和陀螺仪快照 */
 static bool control_read_input(control_input_t *input)
 {
     (void)input;
-    
+    if (mcn_copy(control_rc_sub, &rc, RT_FALSE) != MCN_OK)
+    return false;
+
+    SEGGER_RTT_printf(0, "rc_channel[0]=%d\n", rc.raw[0]);
+
+    if (mcn_copy(control_attitude_sub, &attitude, RT_FALSE) != MCN_OK)
+        return false;
+
+
     return false;
 }
 
-/* TODO: 清零 PID 积分、微分历史和外环分频计数。 */
+/* 清零 PID 积分、微分历史和外环分频计数 */
 static void control_reset(void)
 {
     
@@ -49,7 +64,7 @@ static bool control_update(const control_input_t *input, float motor[4])
     return false;
 }
 
- /* TODO: 接入 PWM/DShot 驱动，按协议映射归一化电机命令。 */
+ /* 接入 PWM/DShot 驱动，按协议映射归一化电机命令 */
 static void control_write_motor(const float motor[4])
 {
     (void)motor;
@@ -73,8 +88,9 @@ static void control_thread_entry(void *parameter)
         }
 
         control_write_motor(motor);
+        rt_thread_delay(3);
     }
-    rt_thread_delay(3);
+    
 }
 
 rt_err_t mp_control_start(void)

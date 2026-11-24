@@ -21,11 +21,38 @@
 #pragma once
 
 #include <stdbool.h>
-#include "common/time.h"
+#include <stdint.h>
 #include "common/filter.h"
-#include "common/axis.h"
 
-#include "pg/pg.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+enum { FD_ROLL = 0, FD_PITCH, FD_YAW, XYZ_AXIS_COUNT };
+#define PID_PROFILE_COUNT 3
+
+typedef enum { PID_MODE_RATE, PID_MODE_ANGLE, PID_MODE_HORIZON } pidMode_t;
+/* 显式替代 BF 的 gyro/attitude/RC/mixer 全局变量。
+ * 本模块内部保持 BF 的 deg、deg/s 单位；uMCN 的 rad 输入需在调用处转换。
+ * 单个控制线程拥有实例及配置，其他线程不可并发修改。
+ */
+typedef struct {
+    float gyro_deg_s[3];
+    float attitude_deg[3];
+    float angle_trim_deg[2];
+    float rate_setpoint_deg_s[3];
+    float max_rc_rate_deg_s[3]; /* 必须 > 0；ANGLE 目标=angle_limit*setpoint/max_rate */
+    float rc_deflection[2];    /* [-1,1]，Horizon 混合权重使用 */
+    float feedforward[3];      /* 已处理的 BF 风格 setpoint delta，非原始摇杆 */
+    float throttle;            /* [0,1] */
+    float motor_mix_range;     /* 上一拍混控占用范围；>=1 时抑制积分增加 */
+    pidMode_t mode;
+    bool gyro_overflow;
+} pidInput_t;
+
+typedef enum { DYN_LPF_NONE, DYN_LPF_PT1, DYN_LPF_BIQUAD,
+               DYN_LPF_PT2, DYN_LPF_PT3 } dynLpfFilter_t;
 
 #define MAX_PID_PROCESS_DENOM       16
 #define PID_CONTROLLER_BETAFLIGHT   1
@@ -54,8 +81,8 @@
 #define ITERM_RELAX_CUTOFF_DEFAULT 15
 
 // Anti gravity I constant
-#define ANTIGRAVITY_KI 0.34f; // if AG gain is 6, about 6 times iTerm will be added
-#define ANTIGRAVITY_KP 0.0034f; // one fifth of the I gain on P by default
+#define ANTIGRAVITY_KI 0.34f // if AG gain is 6, about 6 times iTerm will be added
+#define ANTIGRAVITY_KP 0.0034f // one fifth of the I gain on P by default
 #define ITERM_ACCELERATOR_GAIN_OFF 0
 #define ITERM_ACCELERATOR_GAIN_MAX 250
 
@@ -218,17 +245,22 @@ typedef struct pidProfile_s {
     uint8_t ez_landing_speed;               // Speed below which motor output is limited
 } pidProfile_t;
 
-PG_DECLARE_ARRAY(pidProfile_t, PID_PROFILE_COUNT, pidProfiles);
+/* RAM 配置替代 BF 参数注册/持久化；reset 后填写，可由应用另行保存。 */
+const pidProfile_t *pidProfiles(unsigned index);
+pidProfile_t *pidProfilesMutable(unsigned index);
+void pidResetProfiles(void);
 
 typedef struct pidConfig_s {
     uint8_t pid_process_denom;                   // Processing denominator for PID controller vs gyro sampling rate
 
 } pidConfig_t;
 
-PG_DECLARE(pidConfig_t, pidConfig);
+const pidConfig_t *pidConfig(void);
+pidConfig_t *pidConfigMutable(void);
 
-union rollAndPitchTrims_u;
-void pidController(const pidProfile_t *pidProfile, timeUs_t currentTimeUs);
+/* 需先 pidInit；更新输入后调用，输出在 pidData[].Sum，沿用 BF 缩放。 */
+void pidController(const pidProfile_t *pidProfile, const pidInput_t *input);
+void pidResetState(void);
 
 typedef struct pidAxisData_s {
     float P;
@@ -254,6 +286,7 @@ typedef struct pidCoefficient_s {
 } pidCoefficient_t;
 
 typedef struct pidRuntime_s {
+    bool initialized;
     float dT;
     float pidFrequency;
     bool pidStabilisationEnabled;
@@ -265,8 +298,10 @@ typedef struct pidRuntime_s {
     biquadFilter_t dtermNotch[XYZ_AXIS_COUNT];
     filterApplyFnPtr dtermLowpassApplyFn;
     dtermLowpass_t dtermLowpass[XYZ_AXIS_COUNT];
+    uint8_t dtermLowpassType;
     filterApplyFnPtr dtermLowpass2ApplyFn;
     dtermLowpass_t dtermLowpass2[XYZ_AXIS_COUNT];
+    uint8_t dtermLowpass2Type;
     filterApplyFnPtr ptermYawLowpassApplyFn;
     pt1Filter_t ptermYawLowpass;
 
@@ -307,29 +342,22 @@ typedef struct pidRuntime_s {
     float tpaLowMultiplier;
     bool tpaLowAlways;
 
-#ifdef USE_ITERM_RELAX                                      /* 减少快速机动时的积分累积 */
     pt1Filter_t windupLpf[XYZ_AXIS_COUNT];
     uint8_t itermRelax;
     uint8_t itermRelaxType;
     uint8_t itermRelaxCutoff;
-#endif
 
-#ifdef USE_D_MIN
     pt2Filter_t dMinRange[XYZ_AXIS_COUNT];
     pt2Filter_t dMinLowpass[XYZ_AXIS_COUNT];
     float dMinPercent[XYZ_AXIS_COUNT];
     float dMinGyroGain;
     float dMinSetpointGain;
-#endif
 
-#ifdef USE_DYN_LPF
     uint8_t dynLpfFilter;
     uint16_t dynLpfMin;
     uint16_t dynLpfMax;
     uint8_t dynLpfCurveExpo;
-#endif
 
-#ifdef USE_FEEDFORWARD                                      /* 前馈控制 */
     feedforwardAveraging_t feedforwardAveraging;
     float feedforwardSmoothFactor;
     uint8_t feedforwardJitterFactor;
@@ -339,9 +367,7 @@ typedef struct pidRuntime_s {
     float feedforwardTransitionInv;
     uint8_t feedforwardMaxRateLimit;
     pt3Filter_t angleFeedforwardPt3[XYZ_AXIS_COUNT];
-#endif
 
-#ifdef USE_ACC
     pt3Filter_t attitudeFilter[2];  // Only for ROLL and PITCH
     pt1Filter_t horizonSmoothingPt1;
     uint16_t horizonDelayMs;
@@ -349,7 +375,6 @@ typedef struct pidRuntime_s {
     float angleEarthRef;
     float angleTarget[2];
     bool axisInAngleMode[3];
-#endif
 } pidRuntime_t;
 
 extern pidRuntime_t pidRuntime;
@@ -371,15 +396,6 @@ bool pidOsdAntiGravityActive(void);
 void pidSetAntiGravityState(bool newState);
 bool pidAntiGravityEnabled(void);
 
-#ifdef UNIT_TEST
-#include "sensors/acceleration.h"
-void applyItermRelax(const int axis, const float iterm,
-    const float gyroRate, float *itermErrorRate, float *currentPidSetpoint);
-void rotateItermAndAxisError(void);
-float pidLevel(int axis, const pidProfile_t *pidProfile,
-    const rollAndPitchTrims_t *angleTrim, float rawSetpoint, float horizonLevelStrength);
-float calcHorizonLevelStrength(void);
-#endif
 
 void dynLpfDTermUpdate(float throttle);
 void pidSetItermReset(bool enabled);
@@ -388,3 +404,7 @@ float pidGetDT(void);
 float pidGetPidFrequency(void);
 
 float dynLpfCutoffFreq(float throttle, uint16_t dynLpfMin, uint16_t dynLpfMax, uint8_t expo);
+
+#ifdef __cplusplus
+}
+#endif

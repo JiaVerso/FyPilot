@@ -2,7 +2,7 @@
  * @Author: Jack Shaw 2870998241@qq.com
  * @Date: 2026-11-16 15:23:48
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-23 16:43:43
+ * @LastEditTime: 2026-11-24 17:41:12
  * @FilePath: /FyPilot/applications/sensors/ekf_task.c
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -11,11 +11,15 @@
 #include "mp_time.h"
 #include "QuaternionEKF.h"
 #include "SEGGER_RTT.h"
+#include "uMcn_topic.h"
 
 static QEKF_INS_t qe;
 static struct rt_thread att_thread;
 static uint8_t attitude_stack[2048];
 static bool started;
+
+extern mcn_topic_t *attitude_topic;
+
 
 static void mp_attitude_entry(void *parameter)
 {
@@ -74,22 +78,16 @@ static void mp_attitude_entry(void *parameter)
             continue;
         else
         {
+            attitude_msg_t msg = {0};
+            msg.timestamp_us = sample.timestamp_us;
+            msg.angle_rad[0] = qe->Roll;
+            msg.angle_rad[1] = qe->Pitch;
+            msg.angle_rad[2] = qe->Yaw;
+
+            int result = mcn_publish(attitude_topic, &msg);
             /* 输出姿态角 */
             static uint32_t last_log_ms;
             uint32_t now_ms = mp_time_now_ms();
-
-            if ((uint32_t)(now_ms - last_log_ms) >= 100U)
-            {
-                last_log_ms = now_ms;
-                // SEGGER_RTT_printf(
-                //     0,
-                //     /* SEGGER's compact formatter does not support %f. */
-                //     "attitude[mdeg]: roll=%d pitch=%d yaw=%d\n",
-                //     (int)(qe->Roll * 1000.0f),
-                //     (int)(qe->Pitch * 1000.0f),
-                //     (int)(qe->Yaw * 1000.0f)
-                // );
-            }
         }
     }
 }

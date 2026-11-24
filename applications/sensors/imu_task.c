@@ -8,6 +8,7 @@
 #include <rtdevice.h>
 #include <finsh.h>
 #include <rthw.h>
+#include "uMcn_topic.h"
 
 static struct rt_thread imu_thread;
 static struct rt_semaphore imu_data_ready;
@@ -50,6 +51,7 @@ static void mp_imu_entry(void *parameter)
             rt_hw_interrupt_enable(level);
 
             rt_err_t mq_err = rt_mq_send(mp_imu_mq(), &sample, sizeof(sample));
+
             if (mq_err != RT_EOK) {
                 ++queue_drop_count;
             }

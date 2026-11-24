@@ -2,18 +2,21 @@
  * @Author: Jack Shaw 2870998241@qq.com
  * @Date: 2026-11-05 23:32:38
  * @LastEditors: Jack Shaw 2870998241@qq.com
- * @LastEditTime: 2026-11-23 11:16:29
+ * @LastEditTime: 2026-11-24 18:06:36
  * @FilePath: /FyPilot/applications/elrs/receiver_crsf.h
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
+#include <rtdevice.h>
+#include <rthw.h>
+#include <finsh.h>
+#include <string.h>
 
 #include "receiver_crsf.h"
 #include "target_config.h"
 #include "SEGGER_RTT.h"
-#include <rtdevice.h>
-#include <rthw.h>
-#include <finsh.h>
+#include "uMcn_topic.h"
 
+extern mcn_topic_t *rc_topic;
 
 static rt_device_t serial;                      /* 串口设备句柄 */      
 static struct rt_semaphore crsf_sem;
@@ -24,8 +27,7 @@ static struct rt_thread receiver_thread;        /* 线程句柄 */
 static rt_uint8_t receiver_stack[2048];
 static crsf_parser_t parser;
 
-
-static crsf_state_t latest;                     /* 数据副本 */
+static crsf_state_t latest;                     
 static bool started;
 
  /* 接收数据回调函数 */
@@ -69,24 +71,14 @@ static void crsf_receiver_entry(void *parameter)
         latest = copy;
         rt_hw_interrupt_enable(level);
 
-        /* Keep RTT output outside the ISR and critical section; limit to 10 Hz. */
-        if ((uint32_t)(time_ms - last_log_ms) >= 100u)
-        {
-            last_log_ms = time_ms;
-            SEGGER_RTT_printf(0,
-                "CRSF[raw]: CH01=%u CH02=%u CH03=%u CH04=%u "
-                "CH05=%u CH06=%u CH07=%u CH08=%u "
-                "CH09=%u CH10=%u CH11=%u CH12=%u "
-                "CH13=%u CH14=%u CH15=%u CH16=%u\n",
-                (uint16_t)latest.raw[0], (uint16_t)latest.raw[1],
-                (uint16_t)latest.raw[2], (uint16_t)latest.raw[3],
-                (uint16_t)latest.raw[4], (uint16_t)latest.raw[5],
-                (uint16_t)latest.raw[6], (uint16_t)latest.raw[7],
-                (uint16_t)latest.raw[8], (uint16_t)latest.raw[9],
-                (uint16_t)latest.raw[10], (uint16_t)latest.raw[11],
-                (uint16_t)latest.raw[12], (uint16_t)latest.raw[13],
-                (uint16_t)latest.raw[14], (uint16_t)latest.raw[15]);
-        }
+        /* msg 拷贝到 rc_topic->data  */
+        rc_channels_msg_t msg = {0};
+
+        msg.timestamp_ms = latest.last_rc_ms;
+        memcpy(msg.raw, latest.raw, sizeof(msg.raw));
+        msg.valid = latest.has_channels;
+
+        int result = mcn_publish(rc_topic, &msg);
 
     }
 } 

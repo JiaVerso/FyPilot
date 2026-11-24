@@ -13,24 +13,29 @@ extern "C" {
 #define MCN_MAX_TOPIC_NAME   32U
 #define MCN_MAX_DATA_SIZE    256U
 
-typedef struct
+typedef struct mcn_subscriber mcn_subscriber_t;
+typedef mcn_subscriber_t *mcn_sub_t;
+
+typedef struct mcn_topic
 {
-    char name[MCN_MAX_TOPIC_NAME];                          /* Topic 名称 */
+    char name[MCN_MAX_TOPIC_NAME];
     rt_uint16_t data_size;
-    rt_uint32_t sequence;                                   /* 消息发布次数 */
+    rt_uint32_t sequence;       /* 发布次数，允许自然回绕 */
     rt_uint8_t data[MCN_MAX_DATA_SIZE];
-    mcn_subscriber_t *subscribers[MCN_MAX_SUBSCRIBERS];     /* 订阅该 Topic 的订阅者指针数组 */
-    rt_bool_t used;                                         /* Topic 是否已分配 */
+    mcn_sub_t subscribers[MCN_MAX_SUBSCRIBERS];
+    rt_bool_t used;
+    rt_bool_t has_data;
 } mcn_topic_t;
 
-
-typedef struct
+struct mcn_subscriber
 {
-    mcn_topic_t *topic;                                     /* 指向订阅的 Topic */
-    rt_sem_t semaphore;
+    mcn_topic_t *topic;
+    struct rt_semaphore semaphore;
     rt_uint32_t last_sequence;
     rt_bool_t active;
-} mcn_subscriber_t;
+    rt_bool_t updated;          /* 独立标志避免序列号回绕漏报更新 */
+    rt_bool_t waiting;
+};
 
 enum {
     MCN_OK       = 0,
@@ -42,16 +47,21 @@ enum {
     MCN_ENODATA  = -6,
 };
 
-typedef struct mcn_subscriber *mcn_sub_t;
-
 int mcn_init(void);
 mcn_topic_t *mcn_advertise(const char *name, uint16_t data_size);
+/* true: 已有数据立即可读；false: only_if_updated/wait 等待下一次发布。 */
 mcn_sub_t mcn_subscribe(const char *name, rt_bool_t start_with_latest);
 int mcn_publish(mcn_topic_t *topic, const void *data);
-int mcn_copy(mcn_subscriber_t *subscriber, const void *data, rt_bool_t only_if_updated);
-int mcn_wait(mcn_subscriber_t *subscriber, rt_int32_t timeout, void *data);
-int mcn_unsubscribe(mcn_subscriber_t *subscriber);
-uint32_t mcn_sequence(mcn_subscriber_t *subscriber);
+/* data 必须指向至少 advertise 时 data_size 字节的可写空间。
+ * 从未发布时，无论 only_if_updated 为何都返回 MCN_ENODATA。
+ */
+int mcn_copy(mcn_sub_t subscriber, void *data, rt_bool_t only_if_updated);
+/* timeout 单位为 tick；0 不等待，RT_WAITING_FOREVER 无限等待新发布。 */
+int mcn_wait(mcn_sub_t subscriber, rt_int32_t timeout, void *data);
+/* 正在 wait 的订阅者不能被取消，返回 MCN_EBUSY。 */
+int mcn_unsubscribe(mcn_sub_t subscriber);
+/* 返回话题当前发布序列号；无效句柄返回 0。 */
+uint32_t mcn_sequence(mcn_sub_t subscriber);
 
 #ifdef __cplusplus
 }

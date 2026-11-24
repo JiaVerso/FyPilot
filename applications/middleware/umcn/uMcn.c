@@ -1,35 +1,23 @@
 #include "uMcn.h"
+#include "uMcn_topic.h"
 
-#include <rtthread.h>
 #include <string.h>
 
-#define MCN_SUBSCRIBER_COUNT \
-    (MCN_MAX_TOPICS * MCN_MAX_SUBSCRIBERS)
+#define MCN_SUBSCRIBER_COUNT (MCN_MAX_TOPICS * MCN_MAX_SUBSCRIBERS)
 
- /* 全局静态资源分配 */
 static mcn_topic_t mcn_topics[MCN_MAX_TOPICS];
 static mcn_subscriber_t mcn_subscribers[MCN_SUBSCRIBER_COUNT];
-
 static struct rt_mutex mcn_mutex;
 static rt_bool_t mcn_initialized;
 
- /* take lock */ 
 static int mcn_lock(void)
 {
-    if (!mcn_initialized)
-    {
+    if (rt_interrupt_get_nest() != 0 || !mcn_initialized)
         return MCN_EBUSY;
-    }
-
-    if (rt_mutex_take(&mcn_mutex, RT_WAITING_FOREVER) != RT_EOK)
-    {
-        return MCN_EBUSY;
-    }
-
-    return MCN_OK;
+    return rt_mutex_take(&mcn_mutex, RT_WAITING_FOREVER) == RT_EOK ?
+        MCN_OK : MCN_EBUSY;
 }
 
- /* release lock */ 
 static void mcn_unlock(void)
 {
     rt_mutex_release(&mcn_mutex);
@@ -37,374 +25,255 @@ static void mcn_unlock(void)
 
 static rt_bool_t mcn_topic_name_valid(const char *name)
 {
-    if (name == RT_NULL || name[0] == '\0')
-    {
+    if (name == RT_NULL)
         return RT_FALSE;
+    for (rt_uint32_t i = 0; i < MCN_MAX_TOPIC_NAME; ++i)
+    {
+        if (name[i] == '\0')
+            return i != 0;
     }
-
-    return strlen(name) < MCN_MAX_TOPIC_NAME;
+    return RT_FALSE;
 }
 
- /* 查找话题名称 */ 
 static mcn_topic_t *mcn_find_topic(const char *name)
 {
-    rt_uint32_t index;
-
-    for (index = 0; index < MCN_MAX_TOPICS; index++)
+    for (rt_uint32_t i = 0; i < MCN_MAX_TOPICS; ++i)
     {
-        if (mcn_topics[index].used &&
-            strncmp(mcn_topics[index].name,
-                    name,
-                    MCN_MAX_TOPIC_NAME) == 0)
-        {
-            return &mcn_topics[index];
-        }
+        if (mcn_topics[i].used && strcmp(mcn_topics[i].name, name) == 0)
+            return &mcn_topics[i];
     }
-
     return RT_NULL;
 }
 
- /* 查找空闲订阅者 */ 
-static mcn_subscriber_t *mcn_find_free_subscriber(rt_uint32_t *subscriber_index)
-{
-    rt_uint32_t index;
-
-    for (index = 0; index < MCN_SUBSCRIBER_COUNT; index++)
-    {
-        if (!mcn_subscribers[index].active)
-        {
-            if (subscriber_index != RT_NULL)
-            {
-                *subscriber_index = index;
-            }
-
-            return &mcn_subscribers[index];
-        }
-    }
-
-    return RT_NULL;
-}
-
- /* initialize mcn module*/
+ /* 初始化 uMCN 自身的互斥锁和资源 */
 int mcn_init(void)
 {
-    rt_err_t result;
-
-    if (mcn_initialized)
-    {
-        return MCN_OK;
-    }
-
-    memset(mcn_topics, 0, sizeof(mcn_topics));
-    memset(mcn_subscribers, 0, sizeof(mcn_subscribers));
-
-    result = rt_mutex_init(&mcn_mutex,
-                           "mcn",
-                           RT_IPC_FLAG_PRIO);
-    if (result != RT_EOK)
-    {
+    if (rt_interrupt_get_nest() != 0)
         return MCN_EBUSY;
-    }
 
-    mcn_initialized = RT_TRUE;
+    /* 初始化无阻塞操作；防止两个初始化线程重复初始化静态对象。 */
+    rt_enter_critical();
+    if (!mcn_initialized)
+    {
+        rt_err_t result = rt_mutex_init(&mcn_mutex, "mcn", RT_IPC_FLAG_PRIO);
+        if (result != RT_EOK)
+        {
+            rt_exit_critical();
+            return MCN_EBUSY;
+        }
+        mcn_initialized = RT_TRUE;
+    }
+    rt_exit_critical();
+    uMcn_topics_init();
     return MCN_OK;
 }
 
- /* 创建话题 */ 
+ /* 注册话题 */
 mcn_topic_t *mcn_advertise(const char *name, uint16_t data_size)
 {
-    rt_uint32_t index;
-    mcn_topic_t *topic;
-
-    /* check */
-    if (!mcn_initialized ||
-        !mcn_topic_name_valid(name) ||
-        data_size == 0 ||
-        data_size > MCN_MAX_DATA_SIZE)
-    {
+    if (!mcn_topic_name_valid(name) || data_size == 0 || data_size > MCN_MAX_DATA_SIZE)
         return RT_NULL;
-    }
-
     if (mcn_lock() != MCN_OK)
-    {
         return RT_NULL;
-    }
 
-    topic = mcn_find_topic(name);
+    mcn_topic_t *topic = mcn_find_topic(name);
     if (topic != RT_NULL)
     {
-        if (topic->data_size != data_size)
-        {
-            topic = RT_NULL;
-        }
-
         mcn_unlock();
-        return topic;
+        return topic->data_size == data_size ? topic : RT_NULL;
     }
-
-    /* 遍历空闲topic数组 */ 
-    for (index = 0; index < MCN_MAX_TOPICS; index++)
+    for (rt_uint32_t i = 0; i < MCN_MAX_TOPICS; ++i)
     {
-        if (!mcn_topics[index].used)
+        if (!mcn_topics[i].used)
         {
-            topic = &mcn_topics[index];
+            topic = &mcn_topics[i];
             memset(topic, 0, sizeof(*topic));
-            strncpy(topic->name, name, MCN_MAX_TOPIC_NAME - 1u);
+            strcpy(topic->name, name);
             topic->data_size = data_size;
             topic->used = RT_TRUE;
-
             mcn_unlock();
             return topic;
         }
     }
-
     mcn_unlock();
     return RT_NULL;
 }
 
- /* subscribe topic */
 mcn_sub_t mcn_subscribe(const char *name, rt_bool_t start_with_latest)
 {
-    rt_uint32_t index;
-    rt_uint32_t subscriber_index;
-    rt_err_t result;
-
-    char semaphore_name[RT_NAME_MAX];
-    mcn_topic_t *topic;
-    mcn_subscriber_t *subscriber;
-
-    if (!mcn_initialized || !mcn_topic_name_valid(name))
-    {
+    if (!mcn_topic_name_valid(name) || mcn_lock() != MCN_OK)
         return RT_NULL;
-    }
 
-    if (mcn_lock() != MCN_OK)
-    {
-        return RT_NULL;
-    }
-
-    /* 判断话题是否存在 */
-    topic = mcn_find_topic(name);
+    mcn_topic_t *topic = mcn_find_topic(name);
     if (topic == RT_NULL)
     {
         mcn_unlock();
         return RT_NULL;
     }
-
-    subscriber = mcn_find_free_subscriber(&subscriber_index);
-    if (subscriber == RT_NULL)
+    rt_uint32_t slot;
+    for (slot = 0; slot < MCN_MAX_SUBSCRIBERS; ++slot)
     {
-        mcn_unlock();
-        return RT_NULL;
-    }
-
-    for (index = 0; index < MCN_MAX_SUBSCRIBERS; index++)
-    {
-        if (topic->subscribers[index] == RT_NULL)
-        {
+        if (topic->subscribers[slot] == RT_NULL)
             break;
+    }
+    if (slot == MCN_MAX_SUBSCRIBERS)
+    {
+        mcn_unlock();
+        return RT_NULL;
+    }
+
+    for (rt_uint32_t i = 0; i < MCN_SUBSCRIBER_COUNT; ++i)
+    {
+        mcn_sub_t sub = &mcn_subscribers[i];
+        if (sub->active)
+            continue;
+        memset(sub, 0, sizeof(*sub));
+        if (rt_sem_init(&sub->semaphore, "mcn_sub", 0, RT_IPC_FLAG_PRIO) != RT_EOK)
+        {
+            mcn_unlock();
+            return RT_NULL;
         }
-    }
-
-    /* 话题订阅对象溢出 */ 
-    if (index == MCN_MAX_SUBSCRIBERS)
-    {
+        sub->topic = topic;
+        sub->last_sequence = topic->sequence;
+        sub->updated = start_with_latest && topic->has_data;
+        sub->active = RT_TRUE;
+        topic->subscribers[slot] = sub;
         mcn_unlock();
-        return RT_NULL;
+        return sub;
     }
-
-    result = rt_sem_init(&subscriber->semaphore,
-                         "mcn_semaphore",
-                         0,
-                         RT_IPC_FLAG_PRIO);
-    if (result != RT_EOK)
-    {
-        mcn_unlock();
-        return RT_NULL;
-    }
-
-    subscriber->topic = topic;
-    subscriber->last_sequence = start_with_latest ? topic->sequence : 0u;
-    subscriber->active = RT_TRUE;
-    topic->subscribers[index] = subscriber;
-
     mcn_unlock();
-    return subscriber;
+    return RT_NULL;
 }
 
 int mcn_publish(mcn_topic_t *topic, const void *data)
 {
-    rt_uint32_t index;
-
-    if (topic == RT_NULL || data == RT_NULL || !topic->used)
+    if (topic == RT_NULL || data == RT_NULL)
+        return MCN_EINVAL;
+    if (mcn_lock() != MCN_OK)
+        return MCN_EBUSY;
+    if (!topic->used)
     {
+        mcn_unlock();
         return MCN_EINVAL;
     }
 
-    if (mcn_lock() != MCN_OK)
-    {
-        return MCN_EBUSY;
-    }
-
-    /* 从data源地址开始，拷贝size大小的内存区域到dest */
     memcpy(topic->data, data, topic->data_size);
-    topic->sequence++;
-
-    for (index = 0; index < MCN_MAX_SUBSCRIBERS; index++)
+    ++topic->sequence;
+    topic->has_data = RT_TRUE;
+    for (rt_uint32_t i = 0; i < MCN_MAX_SUBSCRIBERS; ++i)
     {
-        if (topic->subscribers[index] != RT_NULL)
+        mcn_sub_t sub = topic->subscribers[i];
+        if (sub != RT_NULL && !sub->updated)
         {
-            /* 唤醒订阅对象 */
-            rt_sem_release(&topic->subscribers[index]->semaphore);
+            /* 未消费的更新合并为一次通知，不累计历史消息通知。 */
+            sub->updated = RT_TRUE;
+            rt_sem_release(&sub->semaphore);
         }
     }
-
     mcn_unlock();
     return MCN_OK;
 }
 
-/**
- * @brief 复制数据到指定的接收缓冲区
- *
- * @param subscriber       订阅者句柄
- * @param data             目标缓冲区指针
- * @param only_if_updated  RT_TRUE / RT_FALSE
- *
- * @return  状态码：
- *         - MCN_OK:      成功
- *         - MCN_EINVAL:  无效
- *         - MCN_EBUSY:   取锁失败
- *         - MCN_ENODATA: 无新数据
- */
-int mcn_copy(mcn_subscriber_t *subscriber, const void *data, rt_bool_t only_if_updated)
+/* 调用者持有 mcn_mutex。 */
+static int mcn_copy_locked(mcn_sub_t sub, void *data, rt_bool_t only_if_updated)
 {
-    mcn_topic_t *topic;
-
-    if (subscriber == RT_NULL || data == RT_NULL || !subscriber->active)
-    {
+    if (!sub->active || sub->topic == RT_NULL)
         return MCN_EINVAL;
-    }
-
-    if (mcn_lock() != MCN_OK)
-    {
-        return MCN_EBUSY;
-    }
-
-    topic = subscriber->topic;
-    if (topic == RT_NULL || !subscriber->active)
-    {
-        mcn_unlock();
-        return MCN_EINVAL;
-    }
-
-    /* 只有更新后才读取 */
-    if (only_if_updated && topic->sequence == subscriber->last_sequence)
-    {
-        mcn_unlock();
+    mcn_topic_t *topic = sub->topic;
+    if (!topic->has_data || (only_if_updated && !sub->updated))
         return MCN_ENODATA;
-    }
 
     memcpy(data, topic->data, topic->data_size);
-    subscriber->last_sequence = topic->sequence;
-
-    mcn_unlock();
+    sub->last_sequence = topic->sequence;
+    sub->updated = RT_FALSE;
+    /* 读快照也消费对应通知；持锁时发布者不能插入新通知。 */
+    (void)rt_sem_take(&sub->semaphore, 0);
     return MCN_OK;
 }
 
- /* 等待新数据到达 */
-int mcn_wait(mcn_subscriber_t *subscriber, rt_int32_t timeout, void *data)
+int mcn_copy(mcn_sub_t subscriber, void *data, rt_bool_t only_if_updated)
 {
-    int result;
-    rt_err_t semaphore_result;
-
-    if (subscriber == RT_NULL || data == RT_NULL || !subscriber->active)
-    {
+    if (subscriber == RT_NULL || data == RT_NULL)
         return MCN_EINVAL;
-    }
+    if (mcn_lock() != MCN_OK)
+        return MCN_EBUSY;
+    int result = subscriber->waiting ? MCN_EBUSY :
+        mcn_copy_locked(subscriber, data, only_if_updated);
+    mcn_unlock();
+    return result;
+}
 
-    result = mcn_copy(subscriber, data, RT_TRUE);
-    if (result == MCN_OK)
+int mcn_wait(mcn_sub_t subscriber, rt_int32_t timeout, void *data)
+{
+    if (subscriber == RT_NULL || data == RT_NULL || timeout < RT_WAITING_FOREVER)
+        return MCN_EINVAL;
+    if (mcn_lock() != MCN_OK)
+        return MCN_EBUSY;
+    if (!subscriber->active || subscriber->waiting)
     {
-        return MCN_OK;
-    }
-
-    if (result != MCN_ENODATA)
-    {
+        int result = subscriber->waiting ? MCN_EBUSY : MCN_EINVAL;
+        mcn_unlock();
         return result;
     }
 
-    semaphore_result = rt_sem_take(&subscriber->semaphore, timeout);
-    if (semaphore_result != RT_EOK)
-    {
-        return semaphore_result == -RT_ETIMEOUT ?
-            MCN_ETIMEOUT : MCN_EBUSY;
-    }
-
-    return mcn_copy(subscriber, data, RT_TRUE);
-}
-
- /* 取消订阅 */
-int mcn_unsubscribe(mcn_subscriber_t *subscriber)
-{
-    rt_uint32_t index;
-    mcn_topic_t *topic;
-
-    if (subscriber == RT_NULL || !subscriber->active)
-    {
-        return MCN_EINVAL;
-    }
-
-    if (mcn_lock() != MCN_OK)
-    {
-        return MCN_EBUSY;
-    }
-
-    topic = subscriber->topic;
-    if (topic == RT_NULL)
+    int result = mcn_copy_locked(subscriber, data, RT_TRUE);
+    if (result != MCN_ENODATA)
     {
         mcn_unlock();
-        return MCN_EINVAL;
+        return result;
     }
-
-    for (index = 0; index < MCN_MAX_SUBSCRIBERS; index++)
+    if (timeout == 0)
     {
-        if (topic->subscribers[index] == subscriber)
-        {
-            topic->subscribers[index] = RT_NULL;
-        }
+        mcn_unlock();
+        return MCN_ETIMEOUT;
     }
- 
+    subscriber->waiting = RT_TRUE;
+    mcn_unlock();
+
+    /* 发布若发生在解锁和 take 之间，通知仍保留在信号量中。 */
+    rt_err_t err = rt_sem_take(&subscriber->semaphore, timeout);
+    if (mcn_lock() != MCN_OK)
+        return MCN_EBUSY;
+    subscriber->waiting = RT_FALSE;
+    /* 优先检查数据，处理等待刚超时但发布已完成的边界情况。 */
+    result = mcn_copy_locked(subscriber, data, RT_TRUE);
+    if (result == MCN_ENODATA)
+        result = err == -RT_ETIMEOUT ? MCN_ETIMEOUT : MCN_EBUSY;
+    mcn_unlock();
+    return result;
+}
+
+int mcn_unsubscribe(mcn_sub_t subscriber)
+{
+    if (subscriber == RT_NULL)
+        return MCN_EINVAL;
+    if (mcn_lock() != MCN_OK)
+        return MCN_EBUSY;
+    if (!subscriber->active || subscriber->topic == RT_NULL || subscriber->waiting)
+    {
+        int result = subscriber->waiting ? MCN_EBUSY : MCN_EINVAL;
+        mcn_unlock();
+        return result;
+    }
+    for (rt_uint32_t i = 0; i < MCN_MAX_SUBSCRIBERS; ++i)
+    {
+        if (subscriber->topic->subscribers[i] == subscriber)
+            subscriber->topic->subscribers[i] = RT_NULL;
+    }
+    rt_sem_detach(&subscriber->semaphore);
     subscriber->active = RT_FALSE;
     subscriber->topic = RT_NULL;
-    subscriber->last_sequence = 0u;
-    rt_sem_detach(&subscriber->semaphore);
-
+    subscriber->updated = RT_FALSE;
     mcn_unlock();
     return MCN_OK;
 }
 
- /* 获取订阅者的序列号 */
-uint32_t mcn_sequence(mcn_subscriber_t *subscriber)
+uint32_t mcn_sequence(mcn_sub_t subscriber)
 {
-    rt_uint32_t sequence;
-
-    if (subscriber == RT_NULL || !subscriber->active)
-    {
-        return 0u;
-    }
-
-    if (mcn_lock() != MCN_OK)
-    {
-        return 0u;
-    }
-
-    if (subscriber->topic == RT_NULL || !subscriber->active)
-    {
-        mcn_unlock();
-        return 0u;
-    }
-
-    sequence = subscriber->topic->sequence;
+    if (subscriber == RT_NULL || mcn_lock() != MCN_OK)
+        return 0;
+    uint32_t sequence = subscriber->active && subscriber->topic != RT_NULL ?
+        subscriber->topic->sequence : 0;
     mcn_unlock();
     return sequence;
 }
