@@ -254,6 +254,30 @@ extern "C" {
 #endif
 #endif
 
+#if defined(BSP_UART6_RX_USING_DMA)
+#ifndef UART6_RX_DMA_PRIORITY
+#define UART6_RX_DMA_PRIORITY DMA_PRIORITY_MEDIUM
+#endif
+#ifndef UART6_RX_DMA_PREEMPT_PRIORITY
+#define UART6_RX_DMA_PREEMPT_PRIORITY 1
+#endif
+#ifndef UART6_RX_DMA_SUB_PRIORITY
+#define UART6_RX_DMA_SUB_PRIORITY 0
+#endif
+#ifndef UART6_DMA_RX_CONFIG
+#define UART6_DMA_RX_CONFIG                   \
+    STM32_DMA_RX_BYTE_CIRCULAR_CONFIG_INIT_EX( \
+        UART6_RX_DMA_INSTANCE,                \
+        UART6_RX_DMA_RCC,                     \
+        UART6_RX_DMA_IRQ,                     \
+        0U,                                  \
+        UART6_RX_DMA_REQUEST,                 \
+        UART6_RX_DMA_PRIORITY,                \
+        UART6_RX_DMA_PREEMPT_PRIORITY,        \
+        UART6_RX_DMA_SUB_PRIORITY)
+#endif
+#endif
+
 #ifdef __cplusplus
 }
 #endif

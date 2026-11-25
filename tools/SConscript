@@ -1,0 +1,29 @@
+import os
+from building import *
+
+# 当前 SConscript 所在的源码目录
+cwd = GetCurrentDir()
+
+# 需要编译的源文件，相对于当前目录
+src = [
+    'SEGGER_RTT/RTT/SEGGER_RTT.c',
+    'SEGGER_RTT/RTT/SEGGER_RTT_printf.c',
+]
+
+# 头文件搜索路径
+paths = [
+    os.path.join(cwd, 'SEGGER_RTT/RTT'),
+    os.path.join(cwd, 'SEGGER_RTT/Config'),
+]
+
+# 注册构建分组，选择纯 C 实现
+objs = DefineGroup(
+    'SEGGER_RTT',
+    src,
+    depend=[''],
+    CPPPATH=paths,
+    CPPDEFINES=[('RTT_USE_ASM', 0)],
+)
+
+# 返回给调用此脚本的父脚本
+Return('objs')

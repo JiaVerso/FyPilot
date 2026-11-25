@@ -73,7 +73,7 @@ CRSF 的 app/rx/crsf.c/.h 保留上游实现及版权；当前固件编译 crsf_
 | 供电模式 | LDO |
 | Flash | 2 MiB，镜像从 0x08000000 启动，无 bootloader 偏移 |
 | 当前链接 RAM | AXI SRAM，0x24000000 起，512 KiB |
-| Cache / DMA | I-Cache 开启，D-Cache 关闭，UART/SPI DMA 未启用 |
+| Cache / DMA | I-Cache 开启，D-Cache 关闭；USART6 使用 DMA1 Stream6 循环接收，SPI DMA 未启用 |
 | 下载方式 | J-Link，SWD，默认 1000 kHz |
 
 ### 串口
@@ -81,12 +81,16 @@ CRSF 的 app/rx/crsf.c/.h 保留上游实现及版权；当前固件编译 crsf_
 | 外设 | TX | RX | 用途 / 状态 |
 | --- | --- | --- | --- |
 | USART1 | PA9 | PA10 | 引脚已记录，尚未启用 |
-| USART2 | PD5 | PD6 | 引脚已记录，尚未启用 |
+| USART2 | PD5 | PD6 | 已启用为 `uart2`，默认 115200 8N1；收发尚未实测 |
 | USART3 | PD8 | PD9 | 调试控制台，115200 8N1 |
 | UART4 | PB9 | PB8 | 引脚已记录，尚未启用 |
 | USART6 | PC6 | PC7 | ELRS / CRSF，420000 8N1，当前仅接收 |
 | UART7 | PE8 | PE7 | 引脚已记录，尚未启用 |
 | UART8 | PE1 | PE0 | 引脚已记录，尚未启用 |
+
+USART2 由 `BSP_USING_UART2` 控制，应用可通过 `MP_UART_DEVICE`（`"uart2"`）
+查找设备，按需配置波特率，并打开进行收发。接线时 PD5（TX）连接外设 RX，
+PD6（RX）连接外设 TX，并共地；使用 3.3 V TTL 串口电平。
 
 ### SPI 与 I²C
 

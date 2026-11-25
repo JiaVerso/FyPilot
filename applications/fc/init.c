@@ -1,0 +1,47 @@
+/*
+ * File          : init.c
+ * @Author       : JiaVerso
+ * @Date         : 2026-11-05 20:54:16
+ * @LastEditors: Jack Shaw 2870998241@qq.com
+ * @LastEditTime: 2026-11-24 11:07:07
+ * @FilePath     : /FyPilot/applications/fc/init.c
+ * @Description  : 改为当前 BSP 的应用初始化入口.
+ */
+
+#include <rtthread.h>
+#include <board.h>
+#include <finsh.h>
+
+#include "init.h"
+#include "tasks.h"
+#include "mp_ipc.h"
+#include "uMcn.h"
+#include "SEGGER_RTT.h"
+
+rt_err_t fc_init(void)
+{
+    SEGGER_RTT_printf(0, "\n-- STM32H743VIH6 standalone FyPilot --\n");
+    SEGGER_RTT_printf(0, "HSE=8MHz CPU=%uHz, console uart3 PD8/PD9 115200 8N1\n", SystemCoreClock);
+    SEGGER_RTT_printf(0, "Board bringup: ESC signal pins remain pulled-down inputs on testing time.\n");
+
+    rt_err_t err = mp_ipc_init();
+    rt_err_t mcn = mcn_init();
+    rt_err_t result = tasksInit();
+    
+    if (err != RT_EOK || mcn != RT_EOK || result != RT_EOK)
+    {
+        rt_kprintf("Initialization failed.\n");
+        return -RT_ERROR;
+    }
+    rt_kprintf("All threads have finished initialization.\n");
+
+#ifdef BSP_USING_CRSF
+    rt_kprintf("CRSF: uart6 PC7(RX), 420000 8N1; use crsf for channels.\n");
+#endif
+
+#ifdef BSP_USING_BMI270
+    rt_kprintf("BMI270: SPI4 PE12/13/14 CS=PE11 INT1=PE15; use imu for samples.\n");
+#endif
+
+    return result;
+}
