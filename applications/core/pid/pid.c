@@ -46,6 +46,7 @@ pidRuntime_t pidRuntime;
 
 static pidProfile_t profiles[PID_PROFILE_COUNT];
 static pidConfig_t config = { .pid_process_denom = 1 };
+
 static struct {
     float previousSetpoint[3];
     float previousGyroRateDterm[3];
@@ -58,6 +59,8 @@ const pidProfile_t *pidProfiles(unsigned index)
 {
     return index < PID_PROFILE_COUNT ? &profiles[index] : NULL;
 }
+
+ /* 返回PID参数组的地址 */
 pidProfile_t *pidProfilesMutable(unsigned index)
 {
     return index < PID_PROFILE_COUNT ? &profiles[index] : NULL;
@@ -71,10 +74,6 @@ static void resetLowpassState(dtermLowpass_t *filter, uint8_t type)
     case FILTER_PT1: pt1FilterInit(&filter->pt1Filter, filter->pt1Filter.k); break;
     case FILTER_PT2: pt2FilterInit(&filter->pt2Filter, filter->pt2Filter.k); break;
     case FILTER_PT3: pt3FilterInit(&filter->pt3Filter, filter->pt3Filter.k); break;
-    case FILTER_BIQUAD:
-        filter->biquadFilter.x1 = filter->biquadFilter.x2 = 0.0f;
-        filter->biquadFilter.y1 = filter->biquadFilter.y2 = 0.0f;
-        break;
     }
 }
 
@@ -92,10 +91,7 @@ void pidResetState(void)
     pt2FilterInit(&pidRuntime.antiGravityLpf, pidRuntime.antiGravityLpf.k);
     pt1FilterInit(&pidRuntime.horizonSmoothingPt1, pidRuntime.horizonSmoothingPt1.k);
     for (int i = 0; i < 3; ++i) {
-        pidRuntime.dtermNotch[i].x1 = pidRuntime.dtermNotch[i].x2 = 0.0f;
-        pidRuntime.dtermNotch[i].y1 = pidRuntime.dtermNotch[i].y2 = 0.0f;
         resetLowpassState(&pidRuntime.dtermLowpass[i], pidRuntime.dtermLowpassType);
-        resetLowpassState(&pidRuntime.dtermLowpass2[i], pidRuntime.dtermLowpass2Type);
         pt1FilterInit(&pidRuntime.windupLpf[i], pidRuntime.windupLpf[i].k);
         pt2FilterInit(&pidRuntime.dMinRange[i], pidRuntime.dMinRange[i].k);
         pt2FilterInit(&pidRuntime.dMinLowpass[i], pidRuntime.dMinLowpass[i].k);
@@ -107,9 +103,11 @@ void pidResetState(void)
 
 void resetPidProfile(pidProfile_t *pidProfile)
 {
-    if (pidProfile == NULL) return;
-    /* 这些仅保留为配置元数据，不依赖 BF 的简化调参/电池自动切换模块。 */
-    *pidProfile = (pidProfile_t){
+    if (pidProfile == NULL) 
+        return;
+
+    /* 初始化默认参数 */
+    pidProfile_t profile = {
         .pid = {
             [PID_ROLL] =  PID_ROLL_DEFAULT,
             [PID_PITCH] = PID_PITCH_DEFAULT,
@@ -120,8 +118,6 @@ void resetPidProfile(pidProfile_t *pidProfile)
         .pidSumLimit = PIDSUM_LIMIT,
         .pidSumLimitYaw = PIDSUM_LIMIT_YAW,
         .yaw_lowpass_hz = 100,
-        .dterm_notch_hz = 0,
-        .dterm_notch_cutoff = 0,
         .itermWindupPointPercent = 85,
         .pidAtMinThrottle = PID_STABILISATION_ON,
         .angle_limit = 60,
@@ -142,9 +138,7 @@ void resetPidProfile(pidProfile_t *pidProfile)
 
         .dterm_lpf1_static_hz = DTERM_LPF1_DYN_MIN_HZ_DEFAULT,
 
-        .dterm_lpf2_static_hz = DTERM_LPF2_HZ_DEFAULT,   // second Dterm LPF ON by default
         .dterm_lpf1_type = FILTER_PT1,
-        .dterm_lpf2_type = FILTER_PT1,
         .dterm_lpf1_dyn_min_hz = DTERM_LPF1_DYN_MIN_HZ_DEFAULT,
         .dterm_lpf1_dyn_max_hz = DTERM_LPF1_DYN_MAX_HZ_DEFAULT,
 
@@ -195,7 +189,7 @@ void resetPidProfile(pidProfile_t *pidProfile)
         .ez_landing_limit = 15,
         .ez_landing_speed = 50,
     };
-
+    *pidProfile = profile;
 }
 
 void pidResetProfiles(void)
@@ -230,21 +224,27 @@ void pidResetIterm(void)
 
 void pidUpdateTpaFactor(float throttle)
 {
-
-    throttle = constrainf(throttle, 0.0f, 1.0f);
-    bool isThrottlePastTpaLowBreakpoint = (throttle < pidRuntime.tpaLowBreakpoint && pidRuntime.tpaLowBreakpoint > 0.01f) ? false : true;
     float tpaRate = 0.0f;
-    if (isThrottlePastTpaLowBreakpoint || history.isTpaLowFaded) {
+
+    /* 约束油门 */
+    throttle = constrainf(throttle, 0.0f, 1.0f);
+
+    /* 油门是否越过最低油门点，未越过: False */
+    bool isThrottlePastTpaLowBreakpoint = (throttle < pidRuntime.tpaLowBreakpoint && pidRuntime.tpaLowBreakpoint > 0.01f) ? false : true;
+    
+    /* 正常油门段以及高油门段 */
+    if (isThrottlePastTpaLowBreakpoint) {
         tpaRate = pidRuntime.tpaMultiplier * fmaxf(throttle - pidRuntime.tpaBreakpoint, 0.0f);
-        if (!pidRuntime.tpaLowAlways && !history.isTpaLowFaded) {
-            history.isTpaLowFaded = true;
-        }
     } else {
+    /* 低油门段 */
         tpaRate = pidRuntime.tpaLowMultiplier * (pidRuntime.tpaLowBreakpoint - throttle);
     }
+
+    /* PID增益系数 */
     pidRuntime.tpaFactor = 1.0f - tpaRate;
 }
 
+ /* 油门快速变化时补偿 I 项，防止掉高或过冲 */
 void pidUpdateAntiGravityThrottleFilter(float throttle)
 {
     const float throttleInv = 1.0f - throttle;
@@ -403,31 +403,34 @@ static void applyItermRelax(const pidInput_t *input, const int axis, const float
     }
 }
 
+ /* 控制线程中调用的PID计算函数 */
 void pidController(const pidProfile_t *pidProfile, const pidInput_t *input)
 {
-	/* 保存经过 Dterm 滤波结果 */
+	/*  */
     if (!pidRuntime.initialized || pidProfile == NULL || input == NULL) {
         pidResetState();
         return;
     }
+
+    /* isfinite 判断有限浮点数 */
     bool valid = isfinite(input->throttle) && isfinite(input->motor_mix_range) &&
-        input->motor_mix_range >= 0.0f &&
-        (unsigned)input->mode <= PID_MODE_HORIZON;
-    for (int axis = 0; axis < 3; ++axis) {
+        input->motor_mix_range >= 0.0f && (uint8_t)input->mode <= PID_MODE_HORIZON;
+
+    /* 三轴角速度/姿态角/目标角速度 */
+    for (uint8_t axis = 0; axis < 3; ++axis) {
         valid = valid && isfinite(input->gyro_deg_s[axis]) &&
             isfinite(input->attitude_deg[axis]) && isfinite(input->rate_setpoint_deg_s[axis]) &&
-            isfinite(input->feedforward[axis]) && isfinite(input->max_rc_rate_deg_s[axis]) &&
             input->max_rc_rate_deg_s[axis] > 0.0f;
     }
-    for (int axis = 0; axis < 2; ++axis) {
-        valid = valid && isfinite(input->angle_trim_deg[axis]) &&
-            isfinite(input->rc_deflection[axis]);
-    }
-    if (!valid || input->gyro_overflow) {
+    if (!valid) 
+    {
         pidResetState();
         return;
     }
+
+    /* 油门PID增益 */
     pidUpdateTpaFactor(input->throttle);
+
     pidUpdateAntiGravityThrottleFilter(constrainf(input->throttle, 0.0f, 1.0f));
     dynLpfDTermUpdate(constrainf(input->throttle, 0.0f, 1.0f));
     /* 原移植丢失的积分抗饱和因子，输入来自上一拍 mixer。 */
@@ -467,9 +470,7 @@ void pidController(const pidProfile_t *pidProfile, const pidInput_t *input)
     for (int axis = FD_ROLL; axis <= FD_YAW; ++axis) {
         gyroRateDterm[axis] = input->gyro_deg_s[axis];
 
-        gyroRateDterm[axis] = pidRuntime.dtermNotchApplyFn((filter_t *) &pidRuntime.dtermNotch[axis], gyroRateDterm[axis]);
         gyroRateDterm[axis] = pidRuntime.dtermLowpassApplyFn((filter_t *) &pidRuntime.dtermLowpass[axis], gyroRateDterm[axis]);
-        gyroRateDterm[axis] = pidRuntime.dtermLowpass2ApplyFn((filter_t *) &pidRuntime.dtermLowpass2[axis], gyroRateDterm[axis]);
     }
 
     if (!history.dtermPrimed) {
@@ -627,11 +628,6 @@ void dynLpfDTermUpdate(float throttle)
         case DYN_LPF_PT1:
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
                 pt1FilterUpdateCutoff(&pidRuntime.dtermLowpass[axis].pt1Filter, pt1FilterGain(cutoffFreq, pidRuntime.dT));
-            }
-            break;
-        case DYN_LPF_BIQUAD:
-            for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                biquadFilterUpdateLPF(&pidRuntime.dtermLowpass[axis].biquadFilter, cutoffFreq, targetPidLooptime);
             }
             break;
         case DYN_LPF_PT2:

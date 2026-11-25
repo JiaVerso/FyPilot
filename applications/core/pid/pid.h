@@ -29,14 +29,24 @@
 extern "C" {
 #endif
 
-enum { FD_ROLL = 0, FD_PITCH, FD_YAW, XYZ_AXIS_COUNT };
+ /* 表示 横滚/俯仰/偏航 三轴数据 */
+enum 
+{ 
+    FD_ROLL = 0, 
+    FD_PITCH, 
+    FD_YAW, 
+    XYZ_AXIS_COUNT 
+};
+
 #define PID_PROFILE_COUNT 3
 
-typedef enum { PID_MODE_RATE, PID_MODE_ANGLE, PID_MODE_HORIZON } pidMode_t;
-/* 显式替代 BF 的 gyro/attitude/RC/mixer 全局变量。
- * 本模块内部保持 BF 的 deg、deg/s 单位；uMCN 的 rad 输入需在调用处转换。
- * 单个控制线程拥有实例及配置，其他线程不可并发修改。
- */
+typedef enum 
+{ 
+    PID_MODE_RATE,
+    PID_MODE_ANGLE, 
+    PID_MODE_HORIZON 
+} pidMode_t;
+
 typedef struct {
     float gyro_deg_s[3];
     float attitude_deg[3];
@@ -93,7 +103,6 @@ typedef enum { DYN_LPF_NONE, DYN_LPF_PT1, DYN_LPF_BIQUAD,
 
 #define DTERM_LPF1_DYN_MIN_HZ_DEFAULT 75
 #define DTERM_LPF1_DYN_MAX_HZ_DEFAULT 150
-#define DTERM_LPF2_HZ_DEFAULT 150
 
 #define TPA_MAX 100
 
@@ -103,7 +112,7 @@ typedef enum {
 } tpaMode_e;
 
 typedef enum {
-    PID_ROLL,
+    PID_ROLL = 0,
     PID_PITCH,
     PID_YAW,
     PID_LEVEL,
@@ -154,22 +163,21 @@ typedef enum feedforwardAveraging_e {
 #define MAX_PROFILE_NAME_LENGTH 8u
 
 /* 用户配置参数 */
-typedef struct pidProfile_s {
+typedef struct pidProfile_s 
+{
     uint16_t yaw_lowpass_hz;                // Additional yaw filter when yaw axis too noisy
-    uint16_t dterm_lpf1_static_hz;          // PT-1 截止频率
-    uint16_t dterm_notch_hz;                // 二阶巴特沃斯滤波器中心频率
-    uint16_t dterm_notch_cutoff;            // 陷波滤波（削弱某个明显振动频段）的低侧频率
+    uint16_t dterm_lpf1_static_hz;          // D 项低通的固定截止频率；0 为关闭
 
     pidf_t  pid[PID_ITEM_COUNT];
 
     uint8_t dterm_lpf1_type;                // Filter type for dterm lowpass 1
-    uint8_t itermWindupPointPercent;        // iterm windup threshold, percent motor saturation
+    uint8_t itermWindupPointPercent;        // 积分项饱和阈值，电机饱和百分比
     uint16_t pidSumLimit;
     uint16_t pidSumLimitYaw;
     uint8_t pidAtMinThrottle;               // Disable/Enable pids on zero throttle. Normally even without airmode P and D would be active.
     uint8_t angle_limit;                    // Max angle in degrees in Angle mode
 
-    uint8_t horizon_limit_degrees;          // in Horizon mode, zero levelling when the quad's attitude exceeds this angle
+    uint8_t horizon_limit_degrees;          // 在“地平模式”（Horizo​​n mode）下，当四旋翼的姿态超过此角度时，将不再进行自动调平。
     uint8_t horizon_ignore_sticks;          // 0 = default, meaning both stick and attitude attenuation; 1 = only attitude attenuation
 
     // Betaflight PID controller parameters
@@ -178,15 +186,13 @@ typedef struct pidProfile_s {
     uint16_t rateAccelLimit;                // accel limiter roll/pitch deg/sec/ms
 
     uint16_t itermLimit;
-    uint16_t dterm_lpf2_static_hz;          // Static Dterm lowpass 2 filter cutoff value in hz
 
     uint8_t iterm_rotation;                 // rotates iterm to translate world errors to local coordinate system
     uint8_t iterm_relax_type;               // Specifies type of relax algorithm
     uint8_t iterm_relax_cutoff;             // This cutoff frequency specifies a low pass filter which predicts average response of the quad to setpoint
     uint8_t iterm_relax;                    // Enable iterm suppression during stick input
 
-    uint8_t dterm_lpf2_type;                // Filter type for 2nd dterm lowpass
-    uint16_t dterm_lpf1_dyn_min_hz;         // Dterm lowpass filter 1 min hz when in dynamic mode
+    uint16_t dterm_lpf1_dyn_min_hz;         // 动态截止频率下限；0 为使用固定截止频率
     uint16_t dterm_lpf1_dyn_max_hz;         // Dterm lowpass filter 1 max hz when in dynamic mode
 
     uint8_t d_min[XYZ_AXIS_COUNT];          // Minimum D value on each axis
@@ -245,7 +251,6 @@ typedef struct pidProfile_s {
     uint8_t ez_landing_speed;               // Speed below which motor output is limited
 } pidProfile_t;
 
-/* RAM 配置替代 BF 参数注册/持久化；reset 后填写，可由应用另行保存。 */
 const pidProfile_t *pidProfiles(unsigned index);
 pidProfile_t *pidProfilesMutable(unsigned index);
 void pidResetProfiles(void);
@@ -273,7 +278,6 @@ typedef struct pidAxisData_s {
 
 typedef union dtermLowpass_u {
     pt1Filter_t pt1Filter;
-    biquadFilter_t biquadFilter;
     pt2Filter_t pt2Filter;
     pt3Filter_t pt3Filter;
 } dtermLowpass_t;
@@ -294,14 +298,9 @@ typedef struct pidRuntime_s {
     pidCoefficient_t pidCoefficient[XYZ_AXIS_COUNT];        /* 各轴 PID 系数 */
 
     /* D-低通滤波器 */
-    filterApplyFnPtr dtermNotchApplyFn;
-    biquadFilter_t dtermNotch[XYZ_AXIS_COUNT];
     filterApplyFnPtr dtermLowpassApplyFn;
     dtermLowpass_t dtermLowpass[XYZ_AXIS_COUNT];
     uint8_t dtermLowpassType;
-    filterApplyFnPtr dtermLowpass2ApplyFn;
-    dtermLowpass_t dtermLowpass2[XYZ_AXIS_COUNT];
-    uint8_t dtermLowpass2Type;
     filterApplyFnPtr ptermYawLowpassApplyFn;
     pt1Filter_t ptermYawLowpass;
 
@@ -335,7 +334,7 @@ typedef struct pidRuntime_s {
     /* 碰撞检测/恢复 */
 
     /* 油门相关比例衰减系数 */
-    float tpaFactor;
+    float tpaFactor;                                        /* 油门 PID 衰减 */
     float tpaBreakpoint;                                    /* 高油门衰减开始的油门位置 */
     float tpaMultiplier;                                    /* 衰减斜率 */
     float tpaLowBreakpoint;

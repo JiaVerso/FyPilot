@@ -57,6 +57,7 @@ void pt1FilterUpdateCutoff(pt1Filter_t *filter, float k)
     filter->k = k;
 }
 
+ /* state += k * (input - state); */
 float pt1FilterApply(pt1Filter_t *filter, float input)
 {
     filter->state = filter->state + filter->k * (input - filter->state);

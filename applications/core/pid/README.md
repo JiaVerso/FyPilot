@@ -1,8 +1,13 @@
 # FyPilot PID 适配
 
 `pid.c` / `pid_init.c` 保留原有的角度环、角速度 P/I/D/F、TPA、Anti-Gravity、
-I-term Relax、积分旋转、D-min 及 PT1/PT2/PT3/biquad 滤波计算。
+I-term Relax、积分旋转、D-min 及 PT1/PT2/PT3 滤波计算。
 这些算法均在本模块编译，通过配置字段及输入模式控制，不再依赖 Betaflight 的全局功能宏。
+
+D 项输入只经过一组低通 LPF1，类型由 `dterm_lpf1_type` 选择 PT1/PT2/PT3，
+三轴各自保存状态。`dterm_lpf1_dyn_min_hz = 0` 时使用固定截止频率
+`dterm_lpf1_static_hz`（同样为 0 时直通），否则沿用动态截止频率。
+第二组 D 低通的配置、状态及调用已移除；偏航 P 项低通和其他功能自身的滤波保留。
 
 ## 依赖边界
 
