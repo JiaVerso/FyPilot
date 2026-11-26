@@ -48,13 +48,13 @@ typedef enum
 } pidMode_t;
 
 typedef struct {
-    float gyro_deg_s[3];
+    float gyro_deg_s[3];        /* 获取到的角速度 */
     float attitude_deg[3];
     float angle_trim_deg[2];
     float rate_setpoint_deg_s[3];
     float max_rc_rate_deg_s[3]; /* 必须 > 0；ANGLE 目标=angle_limit*setpoint/max_rate */
     float rc_deflection[2];    /* [-1,1]，Horizon 混合权重使用 */
-    float feedforward[3];      /* 已处理的 BF 风格 setpoint delta，非原始摇杆 */
+    float feedforward[3];      /* setpoint delta，非原始摇杆 */
     float throttle;            /* [0,1] */
     float motor_mix_range;     /* 上一拍混控占用范围；>=1 时抑制积分增加 */
     pidMode_t mode;
@@ -324,7 +324,6 @@ typedef struct pidRuntime_s {
     float horizonIgnoreSticks;
 
     /* 目标变化限制与积分管理 */
-    float maxVelocity[XYZ_AXIS_COUNT];
     float itermWindupPointInv;
     float itermLimit;
     bool itermRotation;
@@ -373,7 +372,6 @@ typedef struct pidRuntime_s {
     float angleYawSetpoint;
     float angleEarthRef;
     float angleTarget[2];
-    bool axisInAngleMode[3];
 } pidRuntime_t;
 
 extern pidRuntime_t pidRuntime;

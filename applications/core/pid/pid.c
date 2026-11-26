@@ -27,10 +27,10 @@
 #include "pid.h"
 #include "common/filter_math.h"
 
-typedef enum {
-    LEVEL_MODE_OFF = 0,
-    LEVEL_MODE_R,
-    LEVEL_MODE_RP,
+typedef enum {  
+    LEVEL_MODE_OFF = 0,         /* 不使用角度环 */
+    LEVEL_MODE_R,               /* ROLL角度外环 */
+    LEVEL_MODE_RP,              /* ROLL、PITCH角度外环 */ 
 } levelMode_e;
 
 const char pidNames[] =
@@ -52,7 +52,7 @@ static struct {
     float previousGyroRateDterm[3];
     float previousThrottle;
     bool isTpaLowFaded;
-    bool dtermPrimed;
+    bool dtermPrimed;           
 } history;
 
 const pidProfile_t *pidProfiles(unsigned index)
@@ -330,10 +330,6 @@ static float accelerationLimit(int axis, float currentPidSetpoint)
 {
     const float currentVelocity = currentPidSetpoint - history.previousSetpoint[axis];
 
-    if (fabsf(currentVelocity) > pidRuntime.maxVelocity[axis]) {
-        currentPidSetpoint = (currentVelocity > 0) ? history.previousSetpoint[axis] + pidRuntime.maxVelocity[axis] : history.previousSetpoint[axis] - pidRuntime.maxVelocity[axis];
-    }
-
     history.previousSetpoint[axis] = currentPidSetpoint;
     return currentPidSetpoint;
 }
@@ -350,27 +346,27 @@ static void rotateVector(float v[XYZ_AXIS_COUNT], float rotation[XYZ_AXIS_COUNT]
     }
 }
 
-static void rotateItermAndAxisError(const pidInput_t *input)
-{
-    if (pidRuntime.itermRotation
-        ) {
-        const float gyroToAngle = pidRuntime.dT * RAD;
-        float rotationRads[XYZ_AXIS_COUNT];
-        for (int i = FD_ROLL; i <= FD_YAW; i++) {
-            rotationRads[i] = input->gyro_deg_s[i] * gyroToAngle;
-        }
-        if (pidRuntime.itermRotation) {
-            float v[XYZ_AXIS_COUNT];
-            for (int i = 0; i < XYZ_AXIS_COUNT; i++) {
-                v[i] = pidData[i].I;
-            }
-            rotateVector(v, rotationRads );
-            for (int i = 0; i < XYZ_AXIS_COUNT; i++) {
-                pidData[i].I = v[i];
-            }
-        }
-    }
-}
+// static void rotateItermAndAxisError(const pidInput_t *input)
+// {
+//     if (pidRuntime.itermRotation
+//         ) {
+//         const float gyroToAngle = pidRuntime.dT * RAD;
+//         float rotationRads[XYZ_AXIS_COUNT];
+//         for (int i = FD_ROLL; i <= FD_YAW; i++) {
+//             rotationRads[i] = input->gyro_deg_s[i] * gyroToAngle;
+//         }
+//         if (pidRuntime.itermRotation) {
+//             float v[XYZ_AXIS_COUNT];
+//             for (int i = 0; i < XYZ_AXIS_COUNT; i++) {
+//                 v[i] = pidData[i].I;
+//             }
+//             rotateVector(v, rotationRads );
+//             for (int i = 0; i < XYZ_AXIS_COUNT; i++) {
+//                 pidData[i].I = v[i];
+//             }
+//         }
+//     }
+// }
 
 
 static void applyItermRelax(const pidInput_t *input, const int axis, const float iterm,
@@ -431,19 +427,27 @@ void pidController(const pidProfile_t *pidProfile, const pidInput_t *input)
     /* 油门PID增益 */
     pidUpdateTpaFactor(input->throttle);
 
-    pidUpdateAntiGravityThrottleFilter(constrainf(input->throttle, 0.0f, 1.0f));
-    dynLpfDTermUpdate(constrainf(input->throttle, 0.0f, 1.0f));
-    /* 原移植丢失的积分抗饱和因子，输入来自上一拍 mixer。 */
-    const float dynCi = constrainf((1.0f - input->motor_mix_range) *
-                                  pidRuntime.itermWindupPointInv, 0.0f, 1.0f);
+    // /* 油门反重力补偿：默认不启用 */
+    // pidUpdateAntiGravityThrottleFilter(constrainf(input->throttle, 0.0f, 1.0f));
 
+    // /* 动态低通：默认不启用 */
+    // dynLpfDTermUpdate(constrainf(input->throttle, 0.0f, 1.0f));
+
+    /* 积分抗饱和系数 */
+    // const float dynCi = constrainf((1.0f - input->motor_mix_range) *
+    //                               pidRuntime.itermWindupPointInv, 0.0f, 1.0f);
+
+    /* 判断是否将TPA用于K/D系数 */
     const float tpaFactorKp = (pidProfile->tpa_mode == TPA_MODE_PD) ? pidRuntime.tpaFactor : 1.0f;
 
-/* 加速度计相关 */
+    /* 加速度计相关 */
     float horizonLevelStrength = 0.0f;
 
     levelMode_e levelMode;
-    if ((input->mode == PID_MODE_ANGLE) || (input->mode == PID_MODE_HORIZON)) {
+    
+    /* 模式判断 */
+    if ((input->mode == PID_MODE_ANGLE) || (input->mode == PID_MODE_HORIZON)) 
+    {
         if (pidRuntime.levelRaceMode) {
             levelMode = LEVEL_MODE_R;
         } else {
@@ -457,14 +461,15 @@ void pidController(const pidProfile_t *pidProfile, const pidInput_t *input)
         levelMode = LEVEL_MODE_OFF;
     }
 
-    if (pidRuntime.antiGravityEnabled) {
-        pidRuntime.antiGravityThrottleD *= pidRuntime.antiGravityGain;
+    // /* 计算 Anti-Gravity 的积分增强量 */
+    // if (pidRuntime.antiGravityEnabled) {
+    //     pidRuntime.antiGravityThrottleD *= pidRuntime.antiGravityGain;
 
-        pidRuntime.itermAccelerator = pidRuntime.antiGravityThrottleD * ANTIGRAVITY_KI;
-    } else {
-        pidRuntime.antiGravityThrottleD = 0.0f;
-        pidRuntime.itermAccelerator = 0.0f;
-    }
+    //     pidRuntime.itermAccelerator = pidRuntime.antiGravityThrottleD * ANTIGRAVITY_KI;
+    // } else {
+    //     pidRuntime.antiGravityThrottleD = 0.0f;
+    //     pidRuntime.itermAccelerator = 0.0f;
+    // }
 
     float gyroRateDterm[XYZ_AXIS_COUNT];
     for (int axis = FD_ROLL; axis <= FD_YAW; ++axis) {
@@ -473,26 +478,24 @@ void pidController(const pidProfile_t *pidProfile, const pidInput_t *input)
         gyroRateDterm[axis] = pidRuntime.dtermLowpassApplyFn((filter_t *) &pidRuntime.dtermLowpass[axis], gyroRateDterm[axis]);
     }
 
+    /* 建立初始滤波角速度 */
     if (!history.dtermPrimed) {
         memcpy(history.previousGyroRateDterm, gyroRateDterm, sizeof(gyroRateDterm));
         history.dtermPrimed = true;
     }
-    rotateItermAndAxisError(input);
 
+    /* 三轴 PID 计算 */
     for (int axis = FD_ROLL; axis <= FD_YAW; ++axis) {
 
         float currentPidSetpoint = input->rate_setpoint_deg_s[axis];
-        if (pidRuntime.maxVelocity[axis]) {
-            currentPidSetpoint = accelerationLimit(axis, currentPidSetpoint);
-        }
 
-        pidRuntime.axisInAngleMode[axis] = false;
         if (axis < FD_YAW) {
-            if (levelMode == LEVEL_MODE_RP || (levelMode == LEVEL_MODE_R && axis == FD_ROLL)) {
-                pidRuntime.axisInAngleMode[axis] = true;
+            if (levelMode == LEVEL_MODE_RP || (levelMode == LEVEL_MODE_R && axis == FD_ROLL)) 
+            {
                 currentPidSetpoint = pidLevel(axis, pidProfile, input, currentPidSetpoint, horizonLevelStrength);
             }
-        } else { // yaw axis only
+        } else { 
+            /* yaw axis only */ 
             if (levelMode == LEVEL_MODE_RP) {
 
                 const float earthRefGain = pidRuntime.angleEarthRef;
