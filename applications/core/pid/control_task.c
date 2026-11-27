@@ -17,24 +17,32 @@ static bool started;
 extern mcn_sub_t control_rc_sub;
 extern mcn_sub_t control_attitude_sub;
 
-/*  */
+ /*  */
 rc_channels_msg_t rc;
 attitude_msg_t attitude;
 
-/* 非阻塞读取最新遥控器、姿态和陀螺仪快照 */
-static bool control_read_input(control_input_t *input)
+/* 读取最新遥控器、姿态和陀螺仪快照，不要求话题有更新。 */
+static bool control_read_input(void)
 {
-    (void)input;
     if (mcn_copy(control_rc_sub, &rc, RT_FALSE) != MCN_OK)
-    return false;
-
-    SEGGER_RTT_printf(0, "rc_channel[0]=%d\n", rc.raw[0]);
+        return false;
 
     if (mcn_copy(control_attitude_sub, &attitude, RT_FALSE) != MCN_OK)
         return false;
 
+    if (!rc.valid || !attitude.valid)
+        return false;
 
-    return false;
+    SEGGER_RTT_printf(0, "rc_channel[0]=%u\n", (unsigned int)rc.raw[0]);
+
+    /* RTT printf 不支持浮点格式；放大 1000 倍，以 mrad 输出。 */
+    SEGGER_RTT_printf(0, "ROLL=%d mrad, PITCH=%d mrad, YAW=%d mrad\n",
+        (int)(attitude.angle_rad[0] * 1000.0f),
+        (int)(attitude.angle_rad[1] * 1000.0f),
+        (int)(attitude.angle_rad[2] * 1000.0f)
+    );
+
+    return true;
 }
 
 /* 清零 PID 积分、微分历史和外环分频计数 */
@@ -43,19 +51,19 @@ static void control_reset(void)
     
 }
 
-/* TODO: 按顺序接入以下计算。
-     *
-     * 1. 角度外环：目标姿态与估计姿态 -> 目标机体系角速度。
-     *    可降低外环频率；两次外环之间保持上次目标角速度。
-     *    yaw 可先采用遥控器给定角速度，roll/pitch 需限制目标角速度。
-     * 2. 角速度内环：目标角速度与 gyro_rad_s -> 三轴控制量。
-     *    反馈使用陀螺仪，不对欧拉角差分；传入实际 dt。
-     * 3. 混控：throttle + 三轴控制量 -> motor[0..3]。
-     *    确认电机编号/旋向，加入饱和处理，并反馈给积分抗饱和逻辑。
-     *
-     * pid.c 尚有 Betaflight 依赖，适配后再调用。
-     * 所有步骤完成、输出有限且在约定范围内后，才返回 true。
-     */
+ /* 混控：throttle + 三轴控制量 -> motor[0..3] */
+static bool mixer_update(const control_input_t *input, float motor[4])
+{
+    (void)input;
+    (void)motor;
+    
+    return false;
+}
+
+/* 
+ * input: 目标姿态与估计姿态 / (目标角速度与 gyro_rad_s -> 三轴控制量)
+ * motor[]: 角度微调值，单位为 deg
+ */
 static bool control_update(const control_input_t *input, float motor[4])
 {
     (void)input;
@@ -68,7 +76,6 @@ static bool control_update(const control_input_t *input, float motor[4])
 static void control_write_motor(const float motor[4])
 {
     (void)motor;
-   
 }
 
 static void control_thread_entry(void *parameter)
@@ -80,7 +87,7 @@ static void control_thread_entry(void *parameter)
         control_input_t input = {0};
         float motor[4] = {0};
 
-        if (!control_read_input(&input) || !input.armed ||
+        if (!control_read_input() || !input.armed ||
             !control_update(&input, motor))
         {
             control_reset();

@@ -86,7 +86,6 @@ void pidResetState(void)
     pidRuntime.itermAccelerator = 0.0f;
     pidRuntime.angleYawSetpoint = 0.0f;
     memset(pidRuntime.angleTarget, 0, sizeof(pidRuntime.angleTarget));
-    memset(pidRuntime.axisInAngleMode, 0, sizeof(pidRuntime.axisInAngleMode));
     pt1FilterInit(&pidRuntime.ptermYawLowpass, pidRuntime.ptermYawLowpass.k);
     pt2FilterInit(&pidRuntime.antiGravityLpf, pidRuntime.antiGravityLpf.k);
     pt1FilterInit(&pidRuntime.horizonSmoothingPt1, pidRuntime.horizonSmoothingPt1.k);
@@ -326,25 +325,25 @@ static float pidLevel(int axis, const pidProfile_t *pidProfile, const pidInput_t
     return currentPidSetpoint;
 }
 
-static float accelerationLimit(int axis, float currentPidSetpoint)
-{
-    const float currentVelocity = currentPidSetpoint - history.previousSetpoint[axis];
+// static float accelerationLimit(int axis, float currentPidSetpoint)
+// {
+//     // const float currentVelocity = currentPidSetpoint - history.previousSetpoint[axis];
 
-    history.previousSetpoint[axis] = currentPidSetpoint;
-    return currentPidSetpoint;
-}
+//     history.previousSetpoint[axis] = currentPidSetpoint;
+//     return currentPidSetpoint;
+// }
 
-static void rotateVector(float v[XYZ_AXIS_COUNT], float rotation[XYZ_AXIS_COUNT])
-{
+// static void rotateVector(float v[XYZ_AXIS_COUNT], float rotation[XYZ_AXIS_COUNT])
+// {
 
-    for (int i = 0; i < XYZ_AXIS_COUNT; i++) {
-        int i_1 = (i + 1) % 3;
-        int i_2 = (i + 2) % 3;
-        float newV = v[i_1] + v[i_2] * rotation[i];
-        v[i_2] -= v[i_1] * rotation[i];
-        v[i_1] = newV;
-    }
-}
+//     for (int i = 0; i < XYZ_AXIS_COUNT; i++) {
+//         int i_1 = (i + 1) % 3;
+//         int i_2 = (i + 2) % 3;
+//         float newV = v[i_1] + v[i_2] * rotation[i];
+//         v[i_2] -= v[i_1] * rotation[i];
+//         v[i_1] = newV;
+//     }
+// }
 
 // static void rotateItermAndAxisError(const pidInput_t *input)
 // {
@@ -369,35 +368,35 @@ static void rotateVector(float v[XYZ_AXIS_COUNT], float rotation[XYZ_AXIS_COUNT]
 // }
 
 
-static void applyItermRelax(const pidInput_t *input, const int axis, const float iterm,
-    const float gyroRate, float *itermErrorRate, float *currentPidSetpoint)
-{
-    const float setpointLpf = pt1FilterApply(&pidRuntime.windupLpf[axis], *currentPidSetpoint);
-    const float setpointHpf = fabsf(*currentPidSetpoint - setpointLpf);
+// static void applyItermRelax(const pidInput_t *input, const int axis, const float iterm,
+//     const float gyroRate, float *itermErrorRate, float *currentPidSetpoint)
+// {
+//     const float setpointLpf = pt1FilterApply(&pidRuntime.windupLpf[axis], *currentPidSetpoint);
+//     const float setpointHpf = fabsf(*currentPidSetpoint - setpointLpf);
 
-    if (pidRuntime.itermRelax) {
-        if (axis < FD_YAW || pidRuntime.itermRelax == ITERM_RELAX_RPY || pidRuntime.itermRelax == ITERM_RELAX_RPY_INC) {
-            float itermRelaxThreshold = ITERM_RELAX_SETPOINT_THRESHOLD;
-            if ((input->mode == PID_MODE_ANGLE)) {
-                itermRelaxThreshold *= 0.2f;
-            }
-            const float itermRelaxFactor = MAX(0, 1 - setpointHpf / itermRelaxThreshold);
-            const bool isDecreasingI =
-                ((iterm > 0) && (*itermErrorRate < 0)) || ((iterm < 0) && (*itermErrorRate > 0));
-            if ((pidRuntime.itermRelax >= ITERM_RELAX_RP_INC) && isDecreasingI) {
+//     if (pidRuntime.itermRelax) {
+//         if (axis < FD_YAW || pidRuntime.itermRelax == ITERM_RELAX_RPY || pidRuntime.itermRelax == ITERM_RELAX_RPY_INC) {
+//             float itermRelaxThreshold = ITERM_RELAX_SETPOINT_THRESHOLD;
+//             if ((input->mode == PID_MODE_ANGLE)) {
+//                 itermRelaxThreshold *= 0.2f;
+//             }
+//             const float itermRelaxFactor = MAX(0, 1 - setpointHpf / itermRelaxThreshold);
+//             const bool isDecreasingI =
+//                 ((iterm > 0) && (*itermErrorRate < 0)) || ((iterm < 0) && (*itermErrorRate > 0));
+//             if ((pidRuntime.itermRelax >= ITERM_RELAX_RP_INC) && isDecreasingI) {
 
-            } else if (pidRuntime.itermRelaxType == ITERM_RELAX_SETPOINT) {
-                *itermErrorRate *= itermRelaxFactor;
-            } else if (pidRuntime.itermRelaxType == ITERM_RELAX_GYRO ) {
-                *itermErrorRate = fapplyDeadband(setpointLpf - gyroRate, setpointHpf);
-            } else {
-                *itermErrorRate = 0.0f;
-            }
+//             } else if (pidRuntime.itermRelaxType == ITERM_RELAX_SETPOINT) {
+//                 *itermErrorRate *= itermRelaxFactor;
+//             } else if (pidRuntime.itermRelaxType == ITERM_RELAX_GYRO ) {
+//                 *itermErrorRate = fapplyDeadband(setpointLpf - gyroRate, setpointHpf);
+//             } else {
+//                 *itermErrorRate = 0.0f;
+//             }
 
-        }
+//         }
 
-    }
-}
+//     }
+// }
 
  /* 控制线程中调用的PID计算函数 */
 void pidController(const pidProfile_t *pidProfile, const pidInput_t *input)
@@ -489,13 +488,15 @@ void pidController(const pidProfile_t *pidProfile, const pidInput_t *input)
 
         float currentPidSetpoint = input->rate_setpoint_deg_s[axis];
 
-        if (axis < FD_YAW) {
+        if (axis < FD_YAW) 
+        {
             if (levelMode == LEVEL_MODE_RP || (levelMode == LEVEL_MODE_R && axis == FD_ROLL)) 
             {
                 currentPidSetpoint = pidLevel(axis, pidProfile, input, currentPidSetpoint, horizonLevelStrength);
             }
         } else { 
-            /* yaw axis only */ 
+
+            /* 增稳模式才做偏航控制 */ 
             if (levelMode == LEVEL_MODE_RP) {
 
                 const float earthRefGain = pidRuntime.angleEarthRef;
@@ -509,87 +510,91 @@ void pidController(const pidProfile_t *pidProfile, const pidInput_t *input)
             }
         }
 
-        const float gyroRate = input->gyro_deg_s[axis]; // Process variable from gyro output in deg/sec
-        float errorRate = currentPidSetpoint - gyroRate; // r - y
+        /* 计算目标角速度与实际角速度误差 */
+        const float gyroRate = input->gyro_deg_s[axis]; 
+        float errorRate = currentPidSetpoint - gyroRate; 
 
+        /* 保存上一轮的积分 */
         const float previousIterm = pidData[axis].I;
         float itermErrorRate = errorRate;
 
-        {
-            applyItermRelax(input, axis, previousIterm, gyroRate, &itermErrorRate, &currentPidSetpoint);
-            errorRate = currentPidSetpoint - gyroRate;
-        }
-
+        /* 计算Up */
         pidData[axis].P = pidRuntime.pidCoefficient[axis].Kp * errorRate * tpaFactorKp;
+
         if (axis == FD_YAW) {
             pidData[axis].P = pidRuntime.ptermYawLowpassApplyFn((filter_t *) &pidRuntime.ptermYawLowpass, pidData[axis].P);
         }
 
+        /* 计算Ui */
         float Ki = pidRuntime.pidCoefficient[axis].Ki;
         {
             if (axis == FD_YAW) {
                 pidRuntime.itermAccelerator = 0.0f; // no antigravity on yaw iTerm
             }
         }
-        const float iTermChange = (Ki + pidRuntime.itermAccelerator) * dynCi * pidRuntime.dT * itermErrorRate;
+        const float iTermChange = (Ki + pidRuntime.itermAccelerator) * pidRuntime.dT * itermErrorRate;
         pidData[axis].I = constrainf(previousIterm + iTermChange, -pidRuntime.itermLimit, pidRuntime.itermLimit);
 
+        /* 前馈 */
         float pidSetpointDelta = 0;
-
-        if ((input->mode == PID_MODE_ANGLE) && pidRuntime.axisInAngleMode[axis]) {
-
+        if ((input->mode == PID_MODE_ANGLE)) {
             pidSetpointDelta = 0.0f;
         } else {
-
             pidSetpointDelta = input->feedforward[axis];
         }
-        pidRuntime.previousPidSetpoint[axis] = currentPidSetpoint; // this is the value sent to blackbox, and used for Dmin setpoint
+
+        /* 保存本轮最终角速度目标 */
+        pidRuntime.previousPidSetpoint[axis] = currentPidSetpoint; 
 
         if ((pidRuntime.pidCoefficient[axis].Kd > 0)) {
 
             const float delta = - (gyroRateDterm[axis] - history.previousGyroRateDterm[axis]) * pidRuntime.pidFrequency;
             float preTpaD = pidRuntime.pidCoefficient[axis].Kd * delta;
 
-            float dMinFactor = 1.0f;
-            if (pidRuntime.dMinPercent[axis] > 0) {
-                float dMinGyroFactor = pt2FilterApply(&pidRuntime.dMinRange[axis], delta);
-                dMinGyroFactor = fabsf(dMinGyroFactor) * pidRuntime.dMinGyroGain;
-                const float dMinSetpointFactor = (fabsf(pidSetpointDelta)) * pidRuntime.dMinSetpointGain;
-                dMinFactor = MAX(dMinGyroFactor, dMinSetpointFactor);
-                dMinFactor = pidRuntime.dMinPercent[axis] + (1.0f - pidRuntime.dMinPercent[axis]) * dMinFactor;
-                dMinFactor = pt2FilterApply(&pidRuntime.dMinLowpass[axis], dMinFactor);
-                dMinFactor = MIN(dMinFactor, 1.0f);
-            }
+            // float dMinFactor = 1.0f;
+            // if (pidRuntime.dMinPercent[axis] > 0) {
+            //     float dMinGyroFactor = pt2FilterApply(&pidRuntime.dMinRange[axis], delta);
+            //     dMinGyroFactor = fabsf(dMinGyroFactor) * pidRuntime.dMinGyroGain;
+            //     const float dMinSetpointFactor = (fabsf(pidSetpointDelta)) * pidRuntime.dMinSetpointGain;
+            //     dMinFactor = MAX(dMinGyroFactor, dMinSetpointFactor);
+            //     dMinFactor = pidRuntime.dMinPercent[axis] + (1.0f - pidRuntime.dMinPercent[axis]) * dMinFactor;
+            //     dMinFactor = pt2FilterApply(&pidRuntime.dMinLowpass[axis], dMinFactor);
+            //     dMinFactor = MIN(dMinFactor, 1.0f);
+            // }
 
-            preTpaD *= dMinFactor;
+            // preTpaD *= dMinFactor;
             pidData[axis].D = preTpaD * pidRuntime.tpaFactor;
 
         } else {
             pidData[axis].D = 0;
         }
 
+        /* 更新D项滤波后的历史 */
         history.previousGyroRateDterm[axis] = gyroRateDterm[axis];
 
         const float feedforwardGain = pidRuntime.pidCoefficient[axis].Kf;
         pidData[axis].F = feedforwardGain * pidSetpointDelta;
 
-        if (axis != FD_YAW) {
-            float agSetpointAttenuator = fabsf(currentPidSetpoint) / 50.0f;
-            agSetpointAttenuator = MAX(agSetpointAttenuator, 1.0f);
+        // if (axis != FD_YAW) {
+        //     float agSetpointAttenuator = fabsf(currentPidSetpoint) / 50.0f;
+        //     agSetpointAttenuator = MAX(agSetpointAttenuator, 1.0f);
 
-            const float antiGravityPBoost = 1.0f + (pidRuntime.antiGravityThrottleD / agSetpointAttenuator) * pidRuntime.antiGravityPGain;
-            pidData[axis].P *= antiGravityPBoost;
-            if (axis == FD_PITCH) {
-            }
-        }
+        //     const float antiGravityPBoost = 1.0f + (pidRuntime.antiGravityThrottleD / agSetpointAttenuator) * pidRuntime.antiGravityPGain;
+        //     pidData[axis].P *= antiGravityPBoost;
+        //     if (axis == FD_PITCH) {
+        //     }
+        // }
 
+        /* 输出增益 */
         const float pidSum = pidData[axis].P + pidData[axis].I + pidData[axis].D + pidData[axis].F;
         {
             pidData[axis].Sum = pidSum;
         }
     }
 
-    if (!pidRuntime.pidStabilisationEnabled || input->gyro_overflow) {
+    /* 未使能时清零积分 */ 
+    if (!pidRuntime.pidStabilisationEnabled || input->gyro_overflow) 
+    {
         for (int axis = FD_ROLL; axis <= FD_YAW; ++axis) {
             pidData[axis].P = 0;
             pidData[axis].I = 0;
@@ -598,7 +603,8 @@ void pidController(const pidProfile_t *pidProfile, const pidInput_t *input)
 
             pidData[axis].Sum = 0;
         }
-    } else if (pidRuntime.zeroThrottleItermReset) {
+    } else if (pidRuntime.zeroThrottleItermReset) 
+    {
         pidResetIterm();
     }
 }

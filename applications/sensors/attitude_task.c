@@ -80,9 +80,10 @@ static void mp_attitude_entry(void *parameter)
         {
             attitude_msg_t msg = {0};
             msg.timestamp_us = sample.timestamp_us;
-            msg.angle_rad[0] = qe->Roll;
-            msg.angle_rad[1] = qe->Pitch;
-            msg.angle_rad[2] = qe->Yaw;
+            msg.angle_rad[0] = qe->Roll * DEG_TO_RAD;
+            msg.angle_rad[1] = qe->Pitch * DEG_TO_RAD;
+            msg.angle_rad[2] = qe->Yaw * DEG_TO_RAD;
+            msg.valid = true;
 
             int result = mcn_publish(attitude_topic, &msg);
             /* 输出姿态角 */
